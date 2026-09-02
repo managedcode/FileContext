@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>ManagedCode.FileContext</AssemblyName>
+    <RootNamespace>ManagedCode.FileContext</RootNamespace>
+    <PackageId>ManagedCode.FileContext</PackageId>
+    <Title>ManagedCode.FileContext</Title>
+    <Description>Storage-backed file access and Markdown knowledge-graph context for Microsoft Agent Framework agents.</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ManagedCode.MarkdownLd.Kb" />
+    <PackageReference Include="ManagedCode.Storage.Core" />
+    <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" />
+  </ItemGroup>
+</Project>

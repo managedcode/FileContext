@@ -1,0 +1,19 @@
+name: Feature request
+description: Propose a focused file-context capability or provider-neutral improvement.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the agent workflow that is currently difficult or impossible.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Include the observable API or tool behavior and relevant safety constraints.
+    validations:
+      required: true

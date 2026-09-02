@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+.DS_Store
+.idea/
+.vs/
+.vscode/
+TestResults/
+artifacts/
+coverage*
+*.trx
+*.user
+*.suo

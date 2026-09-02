@@ -1,0 +1,60 @@
+name: build-and-test
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  build-and-test:
+    name: build-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore ManagedCode.FileContext.slnx
+
+      - name: Verify formatting
+        run: dotnet format ManagedCode.FileContext.slnx --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build ManagedCode.FileContext.slnx --configuration Release --no-restore
+
+      - name: Test with coverage
+        run: dotnet test tests/ManagedCode.FileContext.Tests/ManagedCode.FileContext.Tests.csproj --configuration Release --no-build /p:CollectCoverage=true /p:CoverletOutput=${{ github.workspace }}/TestResults/coverage /p:CoverletOutputFormat=opencover
+
+      - name: Pack
+        run: dotnet pack src/ManagedCode.FileContext/ManagedCode.FileContext.csproj --configuration Release --no-build --output artifacts
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: TestResults/coverage.opencover.xml
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: package
+          path: artifacts/*.*nupkg
+          if-no-files-found: error
+          retention-days: 7

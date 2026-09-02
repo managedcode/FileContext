@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  release:
+    name: Validate, publish, and release
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Verify tag matches package version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(dotnet msbuild src/ManagedCode.FileContext/ManagedCode.FileContext.csproj -nologo -getProperty:PackageVersion | tr -d '\r')"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "${VERSION}" ] || [ "${TAG_VERSION}" != "${VERSION}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match package version ${VERSION}."
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Restore
+        run: dotnet restore ManagedCode.FileContext.slnx
+
+      - name: Verify formatting
+        run: dotnet format ManagedCode.FileContext.slnx --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build ManagedCode.FileContext.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test tests/ManagedCode.FileContext.Tests/ManagedCode.FileContext.Tests.csproj --configuration Release --no-build
+
+      - name: Pack
+        run: dotnet pack src/ManagedCode.FileContext/ManagedCode.FileContext.csproj --configuration Release --no-build --output artifacts
+
+      - name: Publish to NuGet
+        shell: bash
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NUGET_API_KEY}" ]; then
+            echo "::error::NUGET_API_KEY is not configured."
+            exit 1
+          fi
+          dotnet nuget push "artifacts/ManagedCode.FileContext.${{ steps.version.outputs.version }}.nupkg" \
+            --api-key "${NUGET_API_KEY}" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" artifacts/*.*nupkg \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --verify-tag

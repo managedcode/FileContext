@@ -1,0 +1,31 @@
+name: Bug report
+description: Report reproducible incorrect behavior in ManagedCode.FileContext.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+      description: Include the storage provider, exact exception or result, and a minimal reproduction.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      placeholder: 0.0.1
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: .NET runtime and operating system
+    validations:
+      required: true
