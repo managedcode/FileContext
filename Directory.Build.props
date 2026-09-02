@@ -29,8 +29,6 @@
     <PackageTags>dotnet;agent-framework;file-context;storage;rag;knowledge-graph;markdown;openai;ai-agents;nuget</PackageTags>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>
 
