@@ -15,7 +15,7 @@ internal sealed class StoragePathScope
         var normalized = Normalize(path, allowEmpty);
         return string.IsNullOrEmpty(_rootPrefix)
             ? normalized
-            : string.IsNullOrEmpty(normalized) ? _rootPrefix : $"{_rootPrefix}/{normalized}";
+            : JoinRootAndPath(normalized);
     }
 
     public string? FromStoragePath(string path)
@@ -76,5 +76,12 @@ internal sealed class StoragePathScope
 
         remainder = string.Empty;
         return false;
+    }
+
+    private string JoinRootAndPath(string normalizedPath)
+    {
+        return string.IsNullOrEmpty(normalizedPath)
+            ? _rootPrefix
+            : $"{_rootPrefix}/{normalizedPath}";
     }
 }

@@ -32,25 +32,25 @@ internal sealed class LlmTckTestHost(Func<LlmTckConfiguration> configurationFact
         var application = builder.Build();
         application.MapLlmTckToolReplay();
         application.MapLlmTck();
-        await application.StartAsync(cancellationToken);
+        await application.StartAsync(cancellationToken).ConfigureAwait(false);
         _application = application;
         Endpoint = ResolveEndpoint(application);
 
         using var client = new HttpClient { BaseAddress = Endpoint };
-        await new LlmTckClient(client).ConfigureAsync(configurationFactory(), cancellationToken);
+        await new LlmTckClient(client).ConfigureAsync(configurationFactory(), cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<LlmTckAssertionSummary> GetAssertionsAsync(CancellationToken cancellationToken = default)
     {
         using var client = new HttpClient { BaseAddress = Endpoint };
-        return await new LlmTckClient(client).GetAssertionsAsync(cancellationToken);
+        return await new LlmTckClient(client).GetAssertionsAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async ValueTask DisposeAsync()
     {
         if (_application is not null)
         {
-            await _application.DisposeAsync();
+            await _application.DisposeAsync().ConfigureAwait(false);
         }
     }
 

@@ -23,7 +23,7 @@ internal sealed class TestStorageScope : IAsyncDisposable
             BaseFolder = directory,
             CreateContainerIfNotExists = true,
         });
-        var result = await storage.CreateContainerAsync();
+        var result = await storage.CreateContainerAsync().ConfigureAwait(false);
         result.IsSuccess.ShouldBeTrue(result.Problem?.Detail);
         return new TestStorageScope(directory, storage);
     }
@@ -33,7 +33,7 @@ internal sealed class TestStorageScope : IAsyncDisposable
         Storage.Dispose();
         if (System.IO.Directory.Exists(Directory))
         {
-            await Task.Run(() => System.IO.Directory.Delete(Directory, recursive: true));
+            await Task.Run(() => System.IO.Directory.Delete(Directory, recursive: true)).ConfigureAwait(false);
         }
     }
 }

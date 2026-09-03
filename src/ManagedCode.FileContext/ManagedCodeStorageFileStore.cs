@@ -45,8 +45,11 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
             throw new IOException($"File '{path}' is {metadata.Length} bytes; the full-read limit is {_options.MaximumFullReadBytes} bytes. Use file_context_read_range.");
         }
 
-        await using var stream = await OpenReadCoreAsync(storagePath, cancellationToken).ConfigureAwait(false);
-        return await StorageTextReader.ReadAsync(stream, _options.MaximumFullReadBytes, cancellationToken).ConfigureAwait(false);
+        var stream = await OpenReadCoreAsync(storagePath, cancellationToken).ConfigureAwait(false);
+        await using (stream.ConfigureAwait(false))
+        {
+            return await StorageTextReader.ReadAsync(stream, _options.MaximumFullReadBytes, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     public override async Task<bool> DeleteAsync(string path, CancellationToken cancellationToken = default)
@@ -96,8 +99,8 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
     public override Task<IReadOnlyList<FileSearchResult>> SearchAsync(
         string directory,
         string regexPattern,
-        string? globPattern,
-        bool recursive,
+        string? globPattern = null,
+        bool recursive = false,
         CancellationToken cancellationToken = default)
         => new StorageFileSearcher(this, _options)
             .SearchAsync(directory, regexPattern, globPattern, recursive, cancellationToken);

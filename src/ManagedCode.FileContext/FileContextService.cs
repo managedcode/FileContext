@@ -1,4 +1,3 @@
-using System.Text;
 using ManagedCode.MarkdownLd.Kb;
 using ManagedCode.MarkdownLd.Kb.Pipeline;
 using Microsoft.Extensions.FileSystemGlobbing;
@@ -21,11 +20,11 @@ public sealed class FileContextService : IFileContext
 
     public async Task<FileContextRange> ReadRangeAsync(
         string path,
-        int startLine = 1,
+        int startLine = FileContextDefaults.FirstLineNumber,
         int? lineCount = null,
         CancellationToken cancellationToken = default)
     {
-        if (startLine <= 0)
+        if (startLine < FileContextDefaults.FirstLineNumber)
         {
             throw new ArgumentOutOfRangeException(nameof(startLine), "Line numbers are one-based.");
         }
@@ -33,14 +32,24 @@ public sealed class FileContextService : IFileContext
         var count = lineCount ?? _options.DefaultRangeLineCount;
         if (count <= 0 || count > _options.MaximumRangeLineCount)
         {
-            throw new ArgumentOutOfRangeException(nameof(lineCount), $"Line count must be between 1 and {_options.MaximumRangeLineCount}.");
+            throw new ArgumentOutOfRangeException(
+                nameof(lineCount),
+                $"Line count must be between {FileContextDefaults.FirstLineNumber} and {_options.MaximumRangeLineCount}.");
         }
 
-        var metadata = await _fileStore.GetMetadataAsync(path, cancellationToken).ConfigureAwait(false)
-            ?? throw new FileNotFoundException($"File '{path}' was not found.", path);
-        await using var stream = await _fileStore.OpenReadAsync(path, cancellationToken).ConfigureAwait(false);
-        using var reader = new StreamReader(stream, Encoding.UTF8, true, leaveOpen: false);
-        return await ReadRangeCoreAsync(reader, path, startLine, count, cancellationToken).ConfigureAwait(false);
+        if (await _fileStore.GetMetadataAsync(path, cancellationToken).ConfigureAwait(false) is null)
+        {
+            throw new FileNotFoundException($"File '{path}' was not found.", path);
+        }
+
+        var stream = await _fileStore.OpenReadAsync(path, cancellationToken).ConfigureAwait(false);
+        await using (stream.ConfigureAwait(false))
+        {
+            using var reader = new StreamReader(stream, leaveOpen: true);
+            return await new FileContextRangeReader(_options.MaximumRangeReadBytes)
+                .ReadAsync(reader, path, startLine, count, cancellationToken)
+                .ConfigureAwait(false);
+        }
     }
 
     public async Task<FileContextInfo?> GetInfoAsync(string path, CancellationToken cancellationToken = default)
@@ -115,10 +124,14 @@ public sealed class FileContextService : IFileContext
                 continue;
             }
 
-            await using var stream = await _fileStore.OpenReadAsync(path, cancellationToken).ConfigureAwait(false);
-            var content = await StorageTextReader
-                .ReadAsync(stream, _options.MaximumMarkdownSourceBytes, cancellationToken)
-                .ConfigureAwait(false);
+            var stream = await _fileStore.OpenReadAsync(path, cancellationToken).ConfigureAwait(false);
+            string content;
+            await using (stream.ConfigureAwait(false))
+            {
+                content = await StorageTextReader
+                    .ReadAsync(stream, _options.MaximumMarkdownSourceBytes, cancellationToken)
+                    .ConfigureAwait(false);
+            }
             sources.Add(new MarkdownSourceDocument(path, content));
 
             if (sources.Count >= _options.MaximumMarkdownFiles)
@@ -137,53 +150,4 @@ public sealed class FileContextService : IFileContext
         return (build, sources.Count);
     }
 
-    private async Task<FileContextRange> ReadRangeCoreAsync(
-        StreamReader reader,
-        string path,
-        int startLine,
-        int lineCount,
-        CancellationToken cancellationToken)
-    {
-        var builder = new StringBuilder();
-        var currentLine = 0;
-        var linesAdded = 0;
-        var bytesAdded = 0;
-        while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
-        {
-            currentLine++;
-            if (currentLine < startLine)
-            {
-                continue;
-            }
-
-            if (linesAdded == lineCount)
-            {
-                return new FileContextRange(path, startLine, currentLine - 1, null, true, builder.ToString());
-            }
-
-            bytesAdded = AppendLineWithinLimit(builder, line, bytesAdded);
-            linesAdded++;
-        }
-
-        var endLine = linesAdded == 0 ? startLine - 1 : startLine + linesAdded - 1;
-        return new FileContextRange(path, startLine, endLine, currentLine, false, builder.ToString());
-    }
-
-    private int AppendLineWithinLimit(StringBuilder builder, string line, int bytesAdded)
-    {
-        var separatorBytes = builder.Length == 0 ? 0 : Encoding.UTF8.GetByteCount(Environment.NewLine);
-        var nextBytes = bytesAdded + separatorBytes + Encoding.UTF8.GetByteCount(line);
-        if (nextBytes > _options.MaximumRangeReadBytes)
-        {
-            throw new IOException($"Requested range exceeds the configured {_options.MaximumRangeReadBytes}-byte limit.");
-        }
-
-        if (builder.Length > 0)
-        {
-            builder.AppendLine();
-        }
-
-        builder.Append(line);
-        return nextBytes;
-    }
 }

@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
 
-Storage-backed file tools and Markdown knowledge-graph context for Microsoft Agent Framework.
+Bounded, provider-neutral file tools and Markdown knowledge-graph context for Microsoft Agent Framework.
 
 `ManagedCode.FileContext` turns any [`ManagedCode.Storage.Core.IStorage`](https://github.com/managedcode/Storage) implementation into an Agent Framework file context. An agent can read, list, grep, create, edit, and delete files through the framework's standard `file_access_*` tools; use bounded line-range and metadata tools for large files; and build/search/export a linked-data graph from Markdown through [`ManagedCode.MarkdownLd.Kb`](https://github.com/managedcode/markdown-ld-kb).
 
@@ -40,7 +40,7 @@ flowchart LR
 ## Install
 
 ```bash
-dotnet add package ManagedCode.FileContext --version 0.0.1
+dotnet add package ManagedCode.FileContext --version 0.0.2
 ```
 
 Add one concrete ManagedCode.Storage provider to the host application. For a local filesystem:
@@ -185,14 +185,16 @@ Product code references only `ManagedCode.Storage.Core`; it does not depend on a
 
 ## Tests
 
-The test suite uses real filesystem storage. The tool-loop integration test starts a real ManagedCode.LlmTck HTTP server, returns an OpenAI-compatible `file_access_read` call, lets Agent Framework invoke the storage-backed tool, verifies the tool result was sent back to the model endpoint, and then receives the final response. No live model or API key is required.
+The integration-first test suite uses a unique real filesystem root per test. LlmTck HTTP replays invoke every advertised `file_access_*` and `file_context_*` tool through the actual Agent Framework function loop, then assert the resulting file content or structured tool result. A sparse 1 GiB file scenario verifies bounded range reads, allocation limits, and fail-fast handling for an oversized single line. No live model or API key is required.
 
 ```bash
 dotnet restore ManagedCode.FileContext.slnx
 dotnet format ManagedCode.FileContext.slnx --verify-no-changes
 dotnet build ManagedCode.FileContext.slnx --configuration Release
-dotnet test tests/ManagedCode.FileContext.Tests/ManagedCode.FileContext.Tests.csproj --configuration Release
+dotnet test tests/ManagedCode.FileContext.Tests/ManagedCode.FileContext.Tests.csproj --configuration Release /p:CollectCoverage=true
 ```
+
+The coverage command enforces at least 95% line coverage for the product assembly and writes an OpenCover report under the test project's `TestResults/coverage` directory.
 
 ## Documentation
 
@@ -205,7 +207,7 @@ dotnet test tests/ManagedCode.FileContext.Tests/ManagedCode.FileContext.Tests.cs
 
 ## Release policy
 
-The package version is defined in `Directory.Build.props`. Pull requests and `main` run the required `build-and-test` workflow. NuGet publication is allowed only from the tag-driven GitHub Actions release workflow, and a tag such as `v0.0.1` must exactly match the evaluated package version. The repository intentionally provides no local publish script.
+The package version is defined in `Directory.Build.props`. Pull requests and `main` run the required `build-and-test` workflow. NuGet publication is allowed only from the tag-driven GitHub Actions release workflow, and a tag such as `v0.0.2` must exactly match the evaluated package version. The repository intentionally provides no local publish script.
 
 ## License
 

@@ -58,8 +58,8 @@ jobs:
       - name: Build
         run: dotnet build ManagedCode.FileContext.slnx --configuration Release --no-restore
 
-      - name: Test
-        run: dotnet test tests/ManagedCode.FileContext.Tests/ManagedCode.FileContext.Tests.csproj --configuration Release --no-build
+      - name: Test with coverage
+        run: dotnet test tests/ManagedCode.FileContext.Tests/ManagedCode.FileContext.Tests.csproj --configuration Release --no-build /p:CollectCoverage=true
 
       - name: Pack
         run: dotnet pack src/ManagedCode.FileContext/ManagedCode.FileContext.csproj --configuration Release --no-build --output artifacts -p:IncludeSymbols=false

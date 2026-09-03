@@ -4,13 +4,16 @@ namespace ManagedCode.FileContext;
 
 internal static class StorageTextReader
 {
+    private const int ReaderBufferSize = 1_024;
+    private const int CharacterBufferLength = 4_096;
+
     public static async Task<string> ReadAsync(
         Stream stream,
         long limit,
         CancellationToken cancellationToken)
     {
-        using var reader = new StreamReader(stream, Encoding.UTF8, true, 1024, leaveOpen: true);
-        var buffer = new char[4096];
+        using var reader = new StreamReader(stream, Encoding.UTF8, true, ReaderBufferSize, leaveOpen: true);
+        var buffer = new char[CharacterBufferLength];
         var builder = new StringBuilder();
         var bytesRead = 0L;
 

@@ -4,7 +4,7 @@
     <RootNamespace>ManagedCode.FileContext</RootNamespace>
     <PackageId>ManagedCode.FileContext</PackageId>
     <Title>ManagedCode.FileContext</Title>
-    <Description>Storage-backed file access and Markdown knowledge-graph context for Microsoft Agent Framework agents.</Description>
+    <Description>Bounded, provider-neutral file tools and Markdown knowledge-graph context for Microsoft Agent Framework.</Description>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 

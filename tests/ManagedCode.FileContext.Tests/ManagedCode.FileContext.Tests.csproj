@@ -2,6 +2,13 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <CoverageThreshold>95</CoverageThreshold>
+    <Threshold>$(CoverageThreshold)</Threshold>
+    <ThresholdType>line</ThresholdType>
+    <ThresholdStat>total</ThresholdStat>
+    <CoverletOutput>$(MSBuildProjectDirectory)/TestResults/coverage/coverage</CoverletOutput>
+    <CoverletOutputFormat>opencover</CoverletOutputFormat>
+    <Exclude>[ManagedCode.FileContext.Tests]*</Exclude>
   </PropertyGroup>
 
   <ItemGroup>

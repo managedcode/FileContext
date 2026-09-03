@@ -83,27 +83,30 @@ internal sealed class StorageFileSearcher(
         Regex regex,
         CancellationToken cancellationToken)
     {
-        await using var stream = await fileStore.OpenReadAsync(path, cancellationToken).ConfigureAwait(false);
-        using var reader = new StreamReader(stream, Encoding.UTF8, true, leaveOpen: false);
-        var matches = new List<FileSearchMatch>();
-        var lineNumber = 0;
-
-        while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
+        var stream = await fileStore.OpenReadAsync(path, cancellationToken).ConfigureAwait(false);
+        await using (stream.ConfigureAwait(false))
         {
-            lineNumber++;
-            if (regex.IsMatch(line))
+            using var reader = new StreamReader(stream, Encoding.UTF8, true, leaveOpen: true);
+            var matches = new List<FileSearchMatch>();
+            var lineNumber = 0;
+
+            while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
             {
-                matches.Add(new FileSearchMatch { LineNumber = lineNumber, Line = line });
+                lineNumber++;
+                if (regex.IsMatch(line))
+                {
+                    matches.Add(new FileSearchMatch { LineNumber = lineNumber, Line = line });
+                }
+
+                if (matches.Count >= options.MaximumMatchesPerFile)
+                {
+                    break;
+                }
             }
 
-            if (matches.Count >= options.MaximumMatchesPerFile)
-            {
-                break;
-            }
+            return matches.Count == 0
+                ? null
+                : new FileSearchResult { FileName = path, Snippet = matches[0].Line, MatchingLines = matches };
         }
-
-        return matches.Count == 0
-            ? null
-            : new FileSearchResult { FileName = path, Snippet = matches[0].Line, MatchingLines = matches };
     }
 }

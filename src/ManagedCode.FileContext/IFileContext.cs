@@ -5,7 +5,7 @@ public interface IFileContext
 {
     Task<FileContextRange> ReadRangeAsync(
         string path,
-        int startLine = 1,
+        int startLine = FileContextDefaults.FirstLineNumber,
         int? lineCount = null,
         CancellationToken cancellationToken = default);
 

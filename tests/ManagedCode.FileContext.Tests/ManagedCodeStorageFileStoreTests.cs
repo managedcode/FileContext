@@ -39,7 +39,13 @@ public sealed class ManagedCodeStorageFileStoreTests
     [InlineData("/absolute.txt")]
     [InlineData("docs\\windows.txt")]
     [InlineData("docs//empty.txt")]
-    public async Task Operations_WhenPathEscapesScope_RejectPath(string path)
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData(".")]
+    [InlineData("docs/./file.txt")]
+    [InlineData("docs/../file.txt")]
+    [InlineData("docs/\0file.txt")]
+    public async Task Operations_WhenPathIsNotLogicalRelativePath_RejectPath(string path)
     {
         await using var scope = await TestStorageScope.CreateAsync();
         var store = new ManagedCodeStorageFileStore(scope.Storage);
@@ -73,5 +79,67 @@ public sealed class ManagedCodeStorageFileStoreTests
         var matches = await store.SearchAsync("", "target", "*.txt", recursive: false);
 
         matches.Select(static match => match.FileName).ShouldBe(["top.txt"]);
+    }
+
+    [Fact]
+    public async Task ReadAndDelete_WhenFileDoesNotExist_ReturnExpectedAbsence()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var store = new ManagedCodeStorageFileStore(scope.Storage);
+
+        (await store.ReadAsync("missing.txt")).ShouldBeNull();
+        (await store.FileExistsAsync("missing.txt")).ShouldBeFalse();
+        (await store.DeleteAsync("missing.txt")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task CreateDirectory_ValidatesPathAndCancellationWithoutWritingContent()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var store = new ManagedCodeStorageFileStore(scope.Storage);
+
+        await store.CreateDirectoryAsync("docs");
+        (await store.ListChildrenAsync("")).ShouldBeEmpty();
+
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+        await Should.ThrowAsync<OperationCanceledException>(() =>
+            store.CreateDirectoryAsync("docs", cancellation.Token));
+    }
+
+    [Fact]
+    public async Task Search_WithoutGlob_SkipsOversizedFilesAndReturnsNoEmptyMatches()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var store = new ManagedCodeStorageFileStore(scope.Storage, new FileContextOptions
+        {
+            MaximumSearchFileBytes = 8,
+        });
+        await store.WriteAsync("small.txt", "nothing");
+        await store.WriteAsync("large.txt", "target value");
+
+        var matches = await store.SearchAsync("", "target", globPattern: null, recursive: true);
+
+        matches.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Search_WhenLimitsAreReached_BoundsFilesResultsAndMatches()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var store = new ManagedCodeStorageFileStore(scope.Storage, new FileContextOptions
+        {
+            MaximumSearchFiles = 2,
+            MaximumSearchResults = 1,
+            MaximumMatchesPerFile = 1,
+        });
+        await store.WriteAsync("a.txt", "target\ntarget");
+        await store.WriteAsync("b.txt", "target");
+        await store.WriteAsync("c.txt", "target");
+
+        var matches = await store.SearchAsync("", "target", recursive: true);
+
+        matches.Count.ShouldBe(1);
+        matches[0].MatchingLines.Count.ShouldBe(1);
     }
 }

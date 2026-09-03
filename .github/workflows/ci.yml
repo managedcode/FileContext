@@ -38,7 +38,7 @@ jobs:
         run: dotnet build ManagedCode.FileContext.slnx --configuration Release --no-restore
 
       - name: Test with coverage
-        run: dotnet test tests/ManagedCode.FileContext.Tests/ManagedCode.FileContext.Tests.csproj --configuration Release --no-build /p:CollectCoverage=true /p:CoverletOutput=${{ github.workspace }}/TestResults/coverage /p:CoverletOutputFormat=opencover
+        run: dotnet test tests/ManagedCode.FileContext.Tests/ManagedCode.FileContext.Tests.csproj --configuration Release --no-build /p:CollectCoverage=true /p:CoverletOutput=${{ github.workspace }}/TestResults/coverage
 
       - name: Pack
         run: dotnet pack src/ManagedCode.FileContext/ManagedCode.FileContext.csproj --configuration Release --no-build --output artifacts

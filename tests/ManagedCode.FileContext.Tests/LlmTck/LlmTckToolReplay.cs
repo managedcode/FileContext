@@ -52,11 +52,13 @@ internal static class LlmTckToolReplay
         context.Request.EnableBuffering();
         using (var reader = new StreamReader(context.Request.Body, leaveOpen: true))
         {
-            Requests.Enqueue(await reader.ReadToEndAsync(cancellationToken));
+            Requests.Enqueue(await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false));
             context.Request.Body.Position = 0;
         }
 
-        var request = await context.Request.ReadFromJsonAsync<OpenAiChatCompletionRequest>(JsonOptions, cancellationToken);
+        var request = await context.Request
+            .ReadFromJsonAsync<OpenAiChatCompletionRequest>(JsonOptions, cancellationToken)
+            .ConfigureAwait(false);
         if (request is null)
         {
             return Results.BadRequest();
@@ -64,7 +66,7 @@ internal static class LlmTckToolReplay
 
         var result = await runtime.CompleteChatAsync(
             OpenAiWireMapper.ToRuntimeRequest(request),
-            cancellationToken: cancellationToken);
+            cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!result.IsSuccess)
         {
             return Results.Json(OpenAiWireMapper.ToError(result.ErrorCode!, result.ErrorMessage!), statusCode: result.StatusCode);
@@ -81,7 +83,10 @@ internal static class LlmTckToolReplay
         try
         {
             var payload = JsonSerializer.Deserialize<ToolCallPayload>(content, JsonOptions);
-            if (payload?.Kind != ReplayKind || string.IsNullOrWhiteSpace(payload.CallId) || string.IsNullOrWhiteSpace(payload.ToolName))
+            if (payload is null
+                || !string.Equals(payload.Kind, ReplayKind, StringComparison.Ordinal)
+                || string.IsNullOrWhiteSpace(payload.CallId)
+                || string.IsNullOrWhiteSpace(payload.ToolName))
             {
                 return false;
             }

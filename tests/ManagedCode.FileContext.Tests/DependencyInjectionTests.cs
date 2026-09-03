@@ -28,6 +28,7 @@ public sealed class DependencyInjectionTests
         services.AddKeyedManagedCodeFileContext("tenant-a", options => options.RootPrefix = "tenant-a");
         await using var provider = services.BuildServiceProvider();
         var store = provider.GetRequiredKeyedService<AgentFileStore>("tenant-a");
+        using var contextProvider = provider.GetRequiredKeyedService<FileContextProvider>("tenant-a");
 
         await store.WriteAsync("context.txt", "tenant scoped");
 

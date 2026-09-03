@@ -11,33 +11,33 @@ public sealed class FileContextOptions
 
     public bool RequireWriteToolApproval { get; set; } = true;
 
-    public long MaximumFullReadBytes { get; set; } = 1_048_576;
+    public long MaximumFullReadBytes { get; set; } = FileContextDefaults.MaximumFullReadBytes;
 
-    public long MaximumRangeReadBytes { get; set; } = 262_144;
+    public long MaximumRangeReadBytes { get; set; } = FileContextDefaults.MaximumRangeReadBytes;
 
-    public int DefaultRangeLineCount { get; set; } = 200;
+    public int DefaultRangeLineCount { get; set; } = FileContextDefaults.DefaultRangeLineCount;
 
-    public int MaximumRangeLineCount { get; set; } = 1_000;
+    public int MaximumRangeLineCount { get; set; } = FileContextDefaults.MaximumRangeLineCount;
 
-    public int MaximumSearchFiles { get; set; } = 500;
+    public int MaximumSearchFiles { get; set; } = FileContextDefaults.MaximumSearchFiles;
 
-    public long MaximumSearchFileBytes { get; set; } = 4_194_304;
+    public long MaximumSearchFileBytes { get; set; } = FileContextDefaults.MaximumSearchFileBytes;
 
-    public int MaximumSearchResults { get; set; } = 100;
+    public int MaximumSearchResults { get; set; } = FileContextDefaults.MaximumSearchResults;
 
-    public int MaximumMatchesPerFile { get; set; } = 20;
+    public int MaximumMatchesPerFile { get; set; } = FileContextDefaults.MaximumMatchesPerFile;
 
-    public TimeSpan RegexTimeout { get; set; } = TimeSpan.FromSeconds(2);
+    public TimeSpan RegexTimeout { get; set; } = TimeSpan.FromSeconds(FileContextDefaults.RegexTimeoutSeconds);
 
-    public string MarkdownGlob { get; set; } = "**/*.md";
+    public string MarkdownGlob { get; set; } = FileContextDefaults.MarkdownGlob;
 
-    public int MaximumMarkdownFiles { get; set; } = 100;
+    public int MaximumMarkdownFiles { get; set; } = FileContextDefaults.MaximumMarkdownFiles;
 
-    public long MaximumMarkdownSourceBytes { get; set; } = 1_048_576;
+    public long MaximumMarkdownSourceBytes { get; set; } = FileContextDefaults.MaximumMarkdownSourceBytes;
 
-    public int MaximumGraphResults { get; set; } = 20;
+    public int MaximumGraphResults { get; set; } = FileContextDefaults.MaximumGraphResults;
 
-    public int MaximumGraphExportCharacters { get; set; } = 200_000;
+    public int MaximumGraphExportCharacters { get; set; } = FileContextDefaults.MaximumGraphExportCharacters;
 
     internal void Validate()
     {
@@ -56,12 +56,12 @@ public sealed class FileContextOptions
 
         if (DefaultRangeLineCount > MaximumRangeLineCount)
         {
-            throw new ArgumentException("The default range cannot exceed the maximum range.");
+            throw new InvalidOperationException("The default range cannot exceed the maximum range.");
         }
 
         if (RegexTimeout <= TimeSpan.Zero)
         {
-            throw new ArgumentOutOfRangeException(nameof(RegexTimeout));
+            throw new InvalidOperationException("The regex timeout must be greater than zero.");
         }
     }
 
@@ -69,7 +69,7 @@ public sealed class FileContextOptions
     {
         if (value <= 0)
         {
-            throw new ArgumentOutOfRangeException(parameterName);
+            throw new InvalidOperationException($"The {parameterName} option must be greater than zero.");
         }
     }
 }

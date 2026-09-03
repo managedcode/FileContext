@@ -22,7 +22,7 @@ In scope: standard file access, bounded line navigation, metadata, Markdown grap
 12. Each graph operation builds from the current selected storage contents, so graph results cannot become stale between calls.
 13. The context provider injects capability instructions and tools, not arbitrary file content as system instructions.
 14. DI supports both the default `IStorage` and a named/keyed `IStorage` registration.
-15. The NuGet package has version `0.0.1`; publication occurs only from the GitHub Actions release workflow.
+15. The NuGet package has version `0.0.2`; publication occurs only from the GitHub Actions release workflow.
 
 ## Main flow
 
@@ -65,11 +65,13 @@ flowchart TD
 7. Default and keyed Microsoft DI resolution.
 8. Agent Framework receives standard and extended tools from `FileContextProvider`.
 9. A real Agent Framework loop receives an LlmTck tool call, executes storage-backed `file_access_read`, proves the file content reaches the second model request, and returns the expected final answer.
-10. The packed `0.0.1` package installs and runs in a clean smoke project.
+10. LlmTck tool loops exercise every read-only, mutation, and extended tool against the real filesystem provider.
+11. A sparse 1 GiB file supports bounded repeated range reads without proportional allocation; a giant unterminated line fails at the configured byte boundary.
+12. The packed `0.0.2` package installs and runs in a clean smoke project.
 
 ## Definition of done
 
 - All rules have automated coverage at the highest useful boundary.
-- Formatting, Release build, full tests, coverage, package validation, and clean-install smoke checks pass locally.
+- Formatting, Release build, full tests, at least 95% product line coverage, package validation, and clean-install smoke checks pass locally.
 - README and durable docs describe only the implemented API.
 - GitHub Actions validates `main` and publishes NuGet only from an explicit matching version tag.
