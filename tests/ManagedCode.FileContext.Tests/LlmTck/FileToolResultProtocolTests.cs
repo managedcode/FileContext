@@ -15,7 +15,7 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
     [InlineData(FileAccessProvider.ReadFileToolName, "{\"fileName\":\"missing.txt\"}", "not found")]
     [InlineData(FileAccessProvider.LsToolName, "{\"directory\":\"empty\"}", "[]")]
     [InlineData(FileAccessProvider.GrepToolName, "{\"regexPattern\":\"absent\",\"directory\":\"\"}", "[]")]
-    [InlineData(FileContextToolNames.GetInfo, "{\"path\":\"missing.txt\"}", "Error: Function failed.")]
+    [InlineData(FileContextToolNames.GetInfo, "{\"path\":\"missing.txt\"}", "not_found")]
     [InlineData(FileContextToolNames.ReadRange, "{\"path\":\"empty.txt\"}", "\"content\": \"\"")]
     [InlineData(FileContextToolNames.ReadRange, "{\"path\":\"first.txt\",\"startLine\":100}", "\"content\": \"\"")]
     [InlineData(FileContextToolNames.ReadRange, "{\"path\":\"missing.txt\"}", "Error: Function failed.")]
@@ -31,6 +31,29 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
             output.WriteLine(results[0].GetRawText());
             results[0].GetProperty("content").ValueKind.ShouldBe(JsonValueKind.String);
             results[0].GetProperty("content").GetString()!.ShouldContain(expectedContent);
+        }
+    }
+
+    [Theory]
+    [InlineData("missing.txt", "not_found", false)]
+    [InlineData("first.txt", "found", true)]
+    public async Task MetadataLookup_PreservesStructuredResultAfterSessionRestore(string path, string status, bool exists)
+    {
+        var requests = await RunToolLoopAsync(LlmTckToolReplay.CreateResponse(
+            "metadata", FileContextToolNames.GetInfo, JsonSerializer.Serialize(new { path })));
+
+        foreach (var request in requests)
+        {
+            var results = LlmTckToolAssertions.AssertClosedCalls(request, "metadata");
+            using var content = JsonDocument.Parse(results[0].GetProperty("content").GetString()!);
+            content.RootElement.GetProperty("status").GetString().ShouldBe(status);
+            content.RootElement.GetProperty("path").GetString().ShouldBe(path);
+            content.RootElement.TryGetProperty("info", out var info).ShouldBe(exists);
+            if (exists)
+            {
+                info.GetProperty("path").GetString().ShouldBe(path);
+                info.GetProperty("length").GetUInt64().ShouldBe((ulong)13);
+            }
         }
     }
 

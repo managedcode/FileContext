@@ -5,7 +5,7 @@ All notable changes to ManagedCode.FileContext are documented here.
 ## Unreleased
 
 - Preserve UTF-8 byte accounting when a surrogate pair crosses a full-read buffer boundary.
-- Return a missing-file failure from the metadata tool so session restoration cannot turn a null result into empty content; keep the nullable direct API unchanged.
+- Return structured found/not_found metadata tool results with the logical path, preserving them through session restoration; keep the nullable direct API unchanged.
 - Verify tool-result ordering, empty/error outputs, restored-session follow-ups, and concurrent multi-file operations through real filesystem and LlmTck tests.
 - Update Meziantou.Analyzer to 3.0.203. Retain OpenAI 2.12.0 because Microsoft.Extensions.AI.OpenAI 10.9.0 requires OpenAI below 2.13.0.
 

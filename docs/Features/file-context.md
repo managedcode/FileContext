@@ -48,7 +48,7 @@ flowchart TD
 ## Failure flows
 
 - Unsafe paths fail with `ArgumentException`; the storage provider is not called.
-- Missing files return `null` through the direct `AgentFileStore` and `IFileContext.GetInfoAsync` contracts; range reads and the `file_context_info` tool throw `FileNotFoundException`.
+- Missing files return `null` through the direct `AgentFileStore` and `IFileContext.GetInfoAsync` contracts; range reads throw `FileNotFoundException`. The `file_context_info` tool returns a structured `not_found` result with the logical path.
 - Storage failures become `IOException` values with the operation and safe logical path, preserving the provider's safe problem detail.
 - Invalid or catastrophic regex patterns fail deterministically; a regex timeout does not hang the agent invocation.
 - Oversized files, result sets, or graph exports stop at configured boundaries and report truncation or a clear limit failure.
@@ -56,7 +56,7 @@ flowchart TD
 
 ## Empty results and conversation history
 
-An empty file or no search matches is a valid tool outcome. With the tested Agent Framework function-invocation and OpenAI chat pipeline, these become a `role: tool` message with the matching `tool_call_id`: the content contains serialized `""` or `[]`, respectively. The metadata tool reports a missing file as a failure instead of returning `null`, because the tested Agent Framework session roundtrip converts a null function result into empty wire content. Range reads retain their structured window metadata even when their content is empty. Tool exceptions also produce a matching error result during the normal function-invocation loop.
+An empty file or no search matches is a valid tool outcome. With the tested Agent Framework function-invocation and OpenAI chat pipeline, these become a `role: tool` message with the matching `tool_call_id`: the content contains serialized `""` or `[]`, respectively. The metadata tool returns `{ "status": "not_found", "path": "missing.txt" }` for an absent file. Existing files return `{ "status": "found", "path": "notes.txt", "info": { ... } }`, where `info` contains the file metadata. Both structured results survive session restoration; a bare null function result would become empty wire content in the tested Agent Framework pipeline. Storage failures and invalid paths still fail normally. Range reads retain their structured window metadata even when their content is empty. Tool exceptions also produce a matching error result during the normal function-invocation loop.
 
 FileContext does not persist agent sessions, synthesize fallback assistant responses, or repair interrupted model/tool turns. The host owns those concerns: it must preserve call/result pairs when saving or replaying history and handle cancellation, approval pauses, and provider failures before reusing an incomplete turn. A final assistant message does not replace a tool result. Completed tool turns are also tested through Agent Framework session serialization/restoration and a subsequent user request.
 

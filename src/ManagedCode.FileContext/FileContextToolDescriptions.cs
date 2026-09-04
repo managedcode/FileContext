@@ -9,7 +9,7 @@ internal static class FileContextToolDescriptions
         "Read a bounded, one-based line range from a text file. Use this instead of a full read for large files.";
     public const string StartLine = "One-based first line to read.";
     public const string LineCount = "Number of lines to return; omitted uses the configured default.";
-    public const string GetInfo = "Return file size, media type, and last-modified time without reading its content. Fails if the file does not exist.";
+    public const string GetInfo = "Return status, path, and file metadata without reading content. Status is found with info when the file exists, or not_found when it does not.";
     public const string SearchMarkdownGraph =
         "Build a linked-data knowledge graph from scoped Markdown files and search its concepts and relationships.";
     public const string GraphQuery = "Concept or relationship query.";
