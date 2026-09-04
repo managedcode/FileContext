@@ -54,6 +54,20 @@ public sealed class ManagedCodeStorageFileStoreTests
     }
 
     [Fact]
+    public async Task Read_WhenSurrogatePairCrossesBufferBoundary_UsesActualUtf8ByteCount()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var content = new string('a', 4_095) + "😀";
+        var store = new ManagedCodeStorageFileStore(scope.Storage, new FileContextOptions
+        {
+            MaximumFullReadBytes = System.Text.Encoding.UTF8.GetByteCount(content),
+        });
+        await store.WriteAsync("unicode.txt", content);
+
+        (await store.ReadAsync("unicode.txt")).ShouldBe(content);
+    }
+
+    [Fact]
     public async Task Read_WhenFileExceedsConfiguredLimit_DirectsCallerToRangeTool()
     {
         await using var scope = await TestStorageScope.CreateAsync();

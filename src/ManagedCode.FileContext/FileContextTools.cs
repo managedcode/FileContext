@@ -15,11 +15,12 @@ internal sealed class FileContextTools(IFileContext fileContext)
     }
 
     [Description(FileContextToolDescriptions.GetInfo)]
-    public Task<FileContextInfo?> GetInfoAsync(
+    public async Task<FileContextInfo> GetInfoAsync(
         [Description(FileContextToolDescriptions.RelativeFilePath)] string path,
         CancellationToken cancellationToken = default)
     {
-        return fileContext.GetInfoAsync(path, cancellationToken);
+        return await fileContext.GetInfoAsync(path, cancellationToken).ConfigureAwait(false)
+            ?? throw new FileNotFoundException($"File '{path}' was not found.", path);
     }
 
     [Description(FileContextToolDescriptions.SearchMarkdownGraph)]

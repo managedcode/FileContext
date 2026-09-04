@@ -60,6 +60,9 @@ public sealed class FileAccessMutationLlmTckTests
         (await store.ReadAsync(FileName)).ShouldBe(expectedContent);
         LlmTckToolReplay.RecordedRequests.Count.ShouldBe(2);
         LlmTckToolReplay.RecordedRequests[0].ShouldContain(toolName);
+        var results = LlmTckToolAssertions.AssertClosedCalls(
+            LlmTckToolReplay.RecordedRequests[1], $"call-{toolName}");
+        results[0].GetProperty("content").GetString().ShouldNotBeNullOrWhiteSpace();
         var assertions = await host.GetAssertionsAsync();
         assertions.Matched.ShouldBe(2);
         assertions.Unmatched.ShouldBe(0);

@@ -77,21 +77,23 @@ internal static class LlmTckToolReplay
             : Results.Json(OpenAiWireMapper.ToChatResponse(result));
     }
 
-    private static bool TryReadEnvelope(string content, out ToolCallEnvelope envelope)
+    private static bool TryReadEnvelope(string content, out ToolCallEnvelope[] envelope)
     {
         envelope = default!;
         try
         {
-            var payload = JsonSerializer.Deserialize<ToolCallPayload>(content, JsonOptions);
-            if (payload is null
-                || !string.Equals(payload.Kind, ReplayKind, StringComparison.Ordinal)
+            var payloads = JsonSerializer.Deserialize<ToolCallPayload[]>(
+                content.StartsWith('[') ? content : $"[{content}]", JsonOptions);
+            if (payloads is null || payloads.Length == 0 || payloads.Any(static payload =>
+                payload is null || !string.Equals(payload.Kind, ReplayKind, StringComparison.Ordinal)
                 || string.IsNullOrWhiteSpace(payload.CallId)
-                || string.IsNullOrWhiteSpace(payload.ToolName))
+                || string.IsNullOrWhiteSpace(payload.ToolName)))
             {
                 return false;
             }
 
-            envelope = new ToolCallEnvelope(payload.CallId, payload.ToolName, payload.Arguments.GetRawText());
+            envelope = payloads.Select(static payload => new ToolCallEnvelope(
+                payload.CallId!, payload.ToolName!, payload.Arguments.GetRawText())).ToArray();
             return true;
         }
         catch (JsonException)
@@ -100,7 +102,7 @@ internal static class LlmTckToolReplay
         }
     }
 
-    private static object CreateCompletion(ToolCallEnvelope envelope) => new
+    private static object CreateCompletion(ToolCallEnvelope[] envelopes) => new
     {
         id = $"chatcmpl-{Guid.NewGuid():N}",
         @object = "chat.completion",
@@ -115,15 +117,12 @@ internal static class LlmTckToolReplay
                 {
                     role = "assistant",
                     content = (string?)null,
-                    tool_calls = new[]
+                    tool_calls = envelopes.Select(static envelope => new
                     {
-                        new
-                        {
-                            id = envelope.CallId,
-                            type = "function",
-                            function = new { name = envelope.ToolName, arguments = envelope.ArgumentsJson },
-                        },
-                    },
+                        id = envelope.CallId,
+                        type = "function",
+                        function = new { name = envelope.ToolName, arguments = envelope.ArgumentsJson },
+                    }).ToArray(),
                 },
                 finish_reason = "tool_calls",
             },

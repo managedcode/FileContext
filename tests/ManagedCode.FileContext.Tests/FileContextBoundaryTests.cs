@@ -13,6 +13,21 @@ public sealed class FileContextBoundaryTests
     }
 
     [Fact]
+    public async Task MarkdownGraph_WhenSiblingDirectorySharesPrefix_ExcludesSiblingDocuments()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var store = new ManagedCodeStorageFileStore(scope.Storage);
+        var service = new FileContextService(store);
+        await store.WriteAsync("docs/included.md", "# Included document");
+        await store.WriteAsync("docs-other/excluded.md", "# Excluded sibling");
+
+        var result = await service.ExportMarkdownGraphAsync(MarkdownGraphFormat.Mermaid, "docs");
+
+        result.DocumentCount.ShouldBe(1);
+        result.Content.ShouldNotContain("Excluded sibling");
+    }
+
+    [Fact]
     public async Task ReadRange_WhenArgumentsAreOutsideConfiguredBounds_RejectsRequest()
     {
         await using var scope = await TestStorageScope.CreateAsync();
