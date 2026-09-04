@@ -2,8 +2,9 @@
 
 All notable changes to ManagedCode.FileContext are documented here.
 
-## Unreleased
+## 1.0.0 - 2026-09-05
 
+- Prepare the 1.0.0 package with a refreshed README covering setup, agent integration, metadata results, Markdown graphs, concurrency, and operational limits.
 - Preserve UTF-8 byte accounting when a surrogate pair crosses a full-read buffer boundary.
 - Return structured found/not_found metadata tool results with the logical path, preserving them through session restoration; keep the nullable direct API unchanged.
 - Verify tool-result ordering, empty/error outputs, restored-session follow-ups, and concurrent multi-file operations through real filesystem and LlmTck tests.

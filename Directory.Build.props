@@ -12,7 +12,7 @@
     <AnalysisMode>Recommended</AnalysisMode>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NoWarn>$(NoWarn);CS1591;MAAI001</NoWarn>
-    <Version>0.0.2</Version>
+    <Version>1.0.0</Version>
     <PackageVersion>$(Version)</PackageVersion>
   </PropertyGroup>
 

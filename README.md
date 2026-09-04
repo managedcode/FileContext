@@ -1,119 +1,144 @@
 # ManagedCode.FileContext
 
-[![build-and-test](https://github.com/managedcode/FileContext/actions/workflows/ci.yml/badge.svg)](https://github.com/managedcode/FileContext/actions/workflows/ci.yml)
+**Give your .NET agents a workspace they can explore, understand, and edit.**
+
 [![NuGet](https://img.shields.io/nuget/v/ManagedCode.FileContext.svg)](https://www.nuget.org/packages/ManagedCode.FileContext)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
+[![Build](https://github.com/managedcode/FileContext/actions/workflows/ci.yml/badge.svg)](https://github.com/managedcode/FileContext/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/managedcode/FileContext/actions/workflows/codeql.yml/badge.svg)](https://github.com/managedcode/FileContext/actions/workflows/codeql.yml)
+[![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)](https://dotnet.microsoft.com/)
+[![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/managedcode/FileContext/blob/main/LICENSE)
 
-Bounded, provider-neutral file tools and Markdown knowledge-graph context for Microsoft Agent Framework.
+FileContext connects [ManagedCode.Storage](https://github.com/managedcode/Storage) to **Microsoft Agent Framework**. Agents can discover files, search their contents, read relevant line ranges, and work across Markdown documents as a knowledge graph. Enable write tools when the agent needs to create or edit files.
 
-`ManagedCode.FileContext` turns any [`ManagedCode.Storage.Core.IStorage`](https://github.com/managedcode/Storage) implementation into an Agent Framework file context. An agent can read, list, grep, create, edit, and delete files through the framework's standard `file_access_*` tools; use bounded line-range and metadata tools for large files; and build/search/export a linked-data graph from Markdown through [`ManagedCode.MarkdownLd.Kb`](https://github.com/managedcode/markdown-ld-kb).
+Your host supplies an `IStorage` backend and a model client. FileContext supplies the scoped file tools.
 
-The storage provider remains your choice: local filesystem, Azure Blob Storage, Amazon S3, Google Cloud Storage, SFTP, browser storage, or another ManagedCode.Storage provider all share the same agent-facing contract.
+[Quick start](#quick-start) · [Agent integration](#connect-an-agent) · [Tools](#tool-catalog) · [Limits](#bounds-and-workspace-isolation) · [Documentation](#documentation)
 
-## Why FileContext?
+## What you get
 
-Models need more than “attach this file.” Effective file work is iterative:
+| Capability | What the agent can do |
+| --- | --- |
+| File discovery | List directories and grep text with regex and glob filters |
+| Bounded reads | Inspect metadata, read a line window, and follow continuation information |
+| File editing | Create, overwrite, delete, replace text, or edit selected lines when enabled |
+| Markdown knowledge graphs | Search concepts across `.md` documents and export Mermaid, DOT, Turtle, or JSON-LD |
+| Multiple files | Issue independent tool calls in one turn, with optional concurrent execution |
+| Workspace isolation | Resolve logical paths under a configured storage prefix |
+| Observable results | Receive structured `found` / `not_found` metadata results that survive session restoration |
 
-1. list the available files;
-2. search for relevant text or file patterns;
-3. inspect metadata before an expensive read;
-4. read only the relevant line window;
-5. move forward or backward through the file;
-6. optionally edit the selected content;
-7. connect concepts across Markdown documents as a graph.
-
-FileContext provides that workflow without binding the agent to a physical filesystem.
+Product code depends only on `ManagedCode.Storage.Core`, so concrete storage providers stay in your application. The integration suite exercises the real filesystem provider; other backends use the same `IStorage` contract.
 
 ```mermaid
 flowchart LR
-  Agent["Agent Framework agent"] --> Provider["FileContextProvider"]
-  Provider --> Standard["standard file_access_* tools"]
-  Provider --> Extended["bounded file_context_* tools"]
-  Standard --> Adapter["ManagedCodeStorageFileStore"]
-  Extended --> Service["FileContextService"]
-  Adapter --> Storage(("IStorage"))
-  Service --> Storage
-  Service --> Graph["Markdown-LD knowledge graph"]
+  Agent["Agent Framework agent"] --> Context["FileContextProvider"]
+  Context --> Files["Standard file tools"]
+  Context --> Ranges["Range and metadata tools"]
+  Context --> Graph["Markdown graph tools"]
+  Files --> Store["IStorage workspace"]
+  Ranges --> Store
+  Graph --> Store
+  Graph --> Markdown["ManagedCode.MarkdownLd.Kb"]
 ```
 
 ## Install
 
+Requires **.NET 10**. Add FileContext and the storage provider your application uses:
+
 ```bash
-dotnet add package ManagedCode.FileContext --version 0.0.2
+dotnet add package ManagedCode.FileContext --version 1.0.0
+dotnet add package ManagedCode.Storage.FileSystem --version 10.0.7
 ```
 
-Add one concrete ManagedCode.Storage provider to the host application. For a local filesystem:
+The examples below also use the DI service-provider implementation:
 
 ```bash
-dotnet add package ManagedCode.Storage.FileSystem
+dotnet add package Microsoft.Extensions.DependencyInjection --version 10.0.11
 ```
 
 ## Quick start
 
+This example creates a local workspace, adds a Markdown document through the direct storage API, and reads just its second line. It runs without a model or API key.
+
 ```csharp
 using ManagedCode.FileContext;
-using ManagedCode.Storage.Core;
 using ManagedCode.Storage.FileSystem;
 using ManagedCode.Storage.FileSystem.Options;
-using Microsoft.Agents.AI;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
-var services = new ServiceCollection();
-
-IStorage storage = new FileSystemStorage(new FileSystemStorageOptions
+using var storage = new FileSystemStorage(new FileSystemStorageOptions
 {
     BaseFolder = Path.Combine(AppContext.BaseDirectory, "agent-workspace"),
     CreateContainerIfNotExists = true,
 });
 
+var created = await storage.CreateContainerAsync();
+if (!created.IsSuccess)
+{
+    throw new IOException("Could not initialize the file workspace.");
+}
+
+var services = new ServiceCollection();
 services.AddManagedCodeFileContext(storage, options =>
 {
     options.RootPrefix = "project";
     options.RequireReadToolApproval = false;
-    options.EnableWriteTools = false;
 });
 
 await using var serviceProvider = services.BuildServiceProvider();
-var fileContext = serviceProvider.GetRequiredService<FileContextProvider>();
+var store = serviceProvider.GetRequiredService<ManagedCodeStorageFileStore>();
+await store.WriteAsync("docs/retries.md", "# Retry policy\nRetry transient errors up to three times.");
 
-// `modelClient` is any Microsoft.Extensions.AI IChatClient.
-using var contextAwareClient = modelClient
-    .AsBuilder()
-    .UseAIContextProviders(fileContext)
+var context = serviceProvider.GetRequiredService<IFileContext>();
+var page = await context.ReadRangeAsync("docs/retries.md", startLine: 2, lineCount: 1);
+Console.WriteLine(page.Content);
+// Retry transient errors up to three times.
+```
+
+The host creates the example file directly. Agent write tools remain disabled. Approval is disabled for reads in this example; the library defaults to requiring approval for both reads and writes.
+
+## Connect an agent
+
+Given the `serviceProvider` above and your configured `IChatClient modelClient`, add the context provider and the function-invocation pipeline:
+
+```csharp
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+
+var fileTools = serviceProvider.GetRequiredService<FileContextProvider>();
+using var client = modelClient.AsBuilder()
+    .UseAIContextProviders(fileTools)
     .UseFunctionInvocation()
     .Build();
 
-var agent = new ChatClientAgent(
-    contextAwareClient,
+var agent = new ChatClientAgent(client,
     new ChatClientAgentOptions { UseProvidedChatClientAsIs = true });
 
 var response = await agent.RunAsync(
-    "Find the retry policy in the Markdown docs and show the relevant lines.");
+    "Find the retry policy in docs and quote the relevant lines.");
+Console.WriteLine(response.Text);
 ```
 
-`UseFunctionInvocation()` executes function calls returned by the model. In interactive applications, keep the default approval requirement and add Agent Framework's tool-approval flow. The example disables approval only to show a non-interactive read-only setup.
+`modelClient` is supplied by your model-provider integration. `UseFunctionInvocation()` executes the tools requested by the model. Hosts keeping the default approval settings must also handle Agent Framework's approval flow.
 
-## Available tools
+## Tool catalog
 
-Standard tools are supplied by Microsoft Agent Framework's `FileAccessProvider`, so existing Agent Framework prompts and tool-call payloads remain compatible.
+Standard `file_access_*` tools come from Agent Framework's `FileAccessProvider`. FileContext adds complementary range, metadata, and Markdown tools.
 
-| Tool | Purpose | Default |
-| --- | --- | --- |
-| `file_access_read` | Read an entire bounded text file | Enabled, approval required |
-| `file_access_ls` | List direct children of a directory | Enabled, approval required |
-| `file_access_grep` | Case-insensitive regex search with optional glob/directory filters | Enabled, approval required |
-| `file_access_write` | Write or append text | Disabled |
-| `file_access_delete` | Delete a file | Disabled |
-| `file_access_replace` | Replace exact text | Disabled |
-| `file_access_replace_lines` | Replace selected lines | Disabled |
-| `file_context_read_range` | Read a one-based bounded line window and report whether more lines exist | Enabled, approval required |
-| `file_context_info` | Inspect size, media type, and modification time without reading content | Enabled, approval required |
-| `file_context_markdown_graph_search` | Build and ranked-search a graph from scoped Markdown files | Enabled, approval required |
-| `file_context_markdown_graph_export` | Export the graph as Mermaid, DOT, Turtle, or JSON-LD | Enabled, approval required |
+| Tool | Purpose | Enabled by default |
+| --- | --- | :---: |
+| `file_access_ls` | List direct children of a directory | Yes |
+| `file_access_grep` | Search text with case-insensitive regex and optional glob filters | Yes |
+| `file_access_read` | Read an entire text file within the full-read limit | Yes |
+| `file_context_read_range` | Read a bounded, one-based line window | Yes |
+| `file_context_info` | Return file presence and metadata without reading content | Yes |
+| `file_context_markdown_graph_search` | Build and ranked-search a Markdown knowledge graph | Yes |
+| `file_context_markdown_graph_export` | Export a graph as Mermaid, DOT, Turtle, or JSON-LD | Yes |
+| `file_access_write` | Create or overwrite text | No |
+| `file_access_delete` | Delete a file | No |
+| `file_access_replace` | Replace exact text | No |
+| `file_access_replace_lines` | Edit selected lines | No |
 
-Enable modification tools explicitly:
+All enabled tools require approval by default. Configure write access when registering the workspace:
 
 ```csharp
 services.AddManagedCodeFileContext(storage, options =>
@@ -123,44 +148,86 @@ services.AddManagedCodeFileContext(storage, options =>
 });
 ```
 
-## Use the API without an agent
+### Explicit metadata results
 
-`IFileContext` exposes the extended operations directly:
+A missing file is a normal lookup outcome. `file_context_info` returns:
 
-```csharp
-var context = serviceProvider.GetRequiredService<IFileContext>();
-
-var page = await context.ReadRangeAsync("logs/build.log", startLine: 401, lineCount: 100);
-if (page.HasMore)
-{
-    var nextPage = await context.ReadRangeAsync("logs/build.log", page.EndLine + 1, 100);
-}
-
-var graph = await context.SearchMarkdownGraphAsync("storage provider lifetime", "docs");
-var mermaid = await context.ExportMarkdownGraphAsync(MarkdownGraphFormat.Mermaid, "docs");
+```json
+{"status":"not_found","path":"docs/missing.md"}
 ```
 
-## Keyed storage
+An existing file returns `status: "found"`, its logical `path`, and an `info` object containing `path`, `length`, `contentType`, and `lastModified`.
 
-Hosts with multiple workspaces can bind FileContext to keyed `IStorage` instances:
+These results are tested through tool invocation, session serialization/restoration, and the next user request. The direct C# API, `IFileContext.GetInfoAsync`, retains its nullable metadata contract. Storage errors and invalid paths still fail; a missing file in a range read throws `FileNotFoundException`.
+
+## Navigate large files
+
+Read the needed window, then use its continuation metadata:
 
 ```csharp
-services.AddKeyedSingleton<IStorage>("tenant-a", tenantAStorage);
-services.AddKeyedManagedCodeFileContext("tenant-a", options =>
+var page = await context.ReadRangeAsync("logs/build.log", startLine: 401, lineCount: 100);
+Console.WriteLine(page.Content);
+
+if (page.HasMore)
+{
+    var next = await context.ReadRangeAsync("logs/build.log", page.EndLine + 1, 100);
+    Console.WriteLine(next.Content);
+}
+```
+
+Results include `StartLine`, `EndLine`, `HasMore`, and `TotalLines` when the end is reached. Reads stream through the file and retain only bounded content; non-seekable streams are supported. Files above the full-read limit must be accessed through range reads.
+
+## Explore Markdown as a graph
+
+Use [ManagedCode.MarkdownLd.Kb](https://github.com/managedcode/markdown-ld-kb) to connect and search concepts across the Markdown documents in your workspace:
+
+```csharp
+var matches = await context.SearchMarkdownGraphAsync("retry policy", "docs");
+var graph = await context.ExportMarkdownGraphAsync(MarkdownGraphFormat.Mermaid, "docs");
+Console.WriteLine(graph.Content);
+```
+
+Each operation builds from the current selected `.md` files, subject to document and size limits. Graph exports support **Mermaid, DOT, Turtle, and JSON-LD**. This package consumes existing Markdown; conversion from PDF, DOCX, or XLSX is outside its scope.
+
+## Work with multiple files
+
+A model turn can contain several tool calls, each with its own path and result. Function invocation is sequential by default. Enable concurrency in your client pipeline when operations are independent:
+
+```csharp
+.UseFunctionInvocation(configure: client => client.AllowConcurrentInvocation = true)
+```
+
+Direct API consumers can also use `Task.WhenAll` for independent reads:
+
+```csharp
+var pages = await Task.WhenAll(
+    context.ReadRangeAsync("docs/retries.md", 1, 20),
+    context.ReadRangeAsync("docs/timeouts.md", 1, 20));
+```
+
+The tests cover multiple calls in one model turn and concurrent writes/reads on eight separate files. Your storage provider must support the chosen concurrency. Serialize dependent operations and writes to the same path: FileContext provides no cross-file transaction or same-file write lock.
+
+### Separate workspaces with keyed storage
+
+Register keyed services before building the service provider. Each registration can have its own options and storage prefix:
+
+```csharp
+using ManagedCode.Storage.Core;
+
+var workspaceServices = new ServiceCollection();
+workspaceServices.AddKeyedSingleton<IStorage>("research", researchStorage);
+workspaceServices.AddKeyedManagedCodeFileContext("research", options =>
 {
     options.RootPrefix = "agents/research";
 });
 
-var provider = serviceProvider.GetRequiredKeyedService<FileContextProvider>("tenant-a");
+using var workspaces = workspaceServices.BuildServiceProvider();
+var tools = workspaces.GetRequiredKeyedService<FileContextProvider>("research");
 ```
 
-## Limits and safety
+## Bounds and workspace isolation
 
-Every path must be relative and `/`-separated. Rooted paths, `.`/`..` segments, backslashes, empty segments, and NUL characters are rejected before storage access. `RootPrefix` creates a logical workspace boundary and is never returned to the model.
-
-Write tools are off by default. Read and write approvals are on by default. File contents are returned only as tool results and are explicitly treated as untrusted data rather than promoted to system instructions.
-
-Potentially expensive operations are bounded by `FileContextOptions`:
+Paths are logical, relative, and `/`-separated. `RootPrefix` scopes storage access. Path validation rejects traversal and unsafe path forms before storage calls. File contents remain untrusted tool data.
 
 | Option | Default |
 | --- | ---: |
@@ -177,38 +244,36 @@ Potentially expensive operations are bounded by `FileContextOptions`:
 | `MaximumGraphResults` | 20 |
 | `MaximumGraphExportCharacters` | 200,000 |
 
-See [Security](docs/Security.md) for the trust model and operational guidance.
+These settings are available through `FileContextOptions`; their named defaults are exposed by `FileContextDefaults`. Credentials, container lifecycle, authorization, and session persistence remain host responsibilities. When saving conversations, preserve tool-call/result pairs and handle interrupted turns before replaying history.
 
-## Storage-provider compatibility
+## Verified with real integrations
 
-Product code references only `ManagedCode.Storage.Core`; it does not depend on a concrete provider. The adapter uses metadata enumeration plus streaming reads and ordinary storage operations, which keeps the agent contract consistent across providers. Provider credentials, container creation, and lifetime remain the host application's responsibility.
+The suite runs against real filesystem storage, real Markdown graph builds, and an in-process LlmTck HTTP service using Agent Framework's actual function-invocation pipeline. No live model or API key is required.
 
-## Tests
-
-The integration-first test suite uses a unique real filesystem root per test. LlmTck HTTP replays invoke every advertised `file_access_*` and `file_context_*` tool through the actual Agent Framework function loop, then assert the resulting file content or structured tool result. A sparse 1 GiB file scenario verifies bounded range reads, allocation limits, and fail-fast handling for an oversized single line. No live model or API key is required.
+Coverage includes all advertised tools, empty/error results, restored sessions, concurrent file operations, Unicode buffer boundaries, and bounded range reads from a sparse **1 GiB** file. CI enforces **at least 95% product line coverage**, formatting, static analysis, build, tests, and package validation.
 
 ```bash
 dotnet restore ManagedCode.FileContext.slnx
 dotnet format ManagedCode.FileContext.slnx --verify-no-changes
 dotnet build ManagedCode.FileContext.slnx --configuration Release
 dotnet test tests/ManagedCode.FileContext.Tests/ManagedCode.FileContext.Tests.csproj --configuration Release /p:CollectCoverage=true
+dotnet pack src/ManagedCode.FileContext/ManagedCode.FileContext.csproj --configuration Release --no-build --output artifacts
 ```
-
-The coverage command enforces at least 95% line coverage for the product assembly and writes an OpenCover report under the test project's `TestResults/coverage` directory.
 
 ## Documentation
 
-- [Architecture](docs/Architecture.md)
-- [Feature contract](docs/Features/file-context.md)
-- [API overview](docs/API/index.md)
-- [Development setup](docs/Development/setup.md)
-- [Testing](docs/Testing/index.md)
-- [Security](docs/Security.md)
+| Guide | Contents |
+| --- | --- |
+| [Architecture](https://github.com/managedcode/FileContext/blob/main/docs/Architecture.md) | Components, storage boundaries, and invocation flow |
+| [Feature contract](https://github.com/managedcode/FileContext/blob/main/docs/Features/file-context.md) | Behavior, failure modes, and verification scenarios |
+| [API](https://github.com/managedcode/FileContext/blob/main/docs/API/index.md) | Public entry points and integration options |
+| [Development](https://github.com/managedcode/FileContext/blob/main/docs/Development/setup.md) | Setup, commands, and static analysis |
+| [Testing](https://github.com/managedcode/FileContext/blob/main/docs/Testing/index.md) | Integration coverage and quality gates |
+| [Security](https://github.com/managedcode/FileContext/blob/main/docs/Security.md) | Trust model and operational guidance |
+| [Changelog](https://github.com/managedcode/FileContext/blob/main/CHANGELOG.md) | Version history |
 
-## Release policy
+## Releases and license
 
-The package version is defined in `Directory.Build.props`. Pull requests and `main` run the required `build-and-test` workflow. NuGet publication is allowed only from the tag-driven GitHub Actions release workflow, and a tag such as `v0.0.2` must exactly match the evaluated package version. The repository intentionally provides no local publish script.
+Version `1.0.0` is defined centrally in `Directory.Build.props`. NuGet publication runs only through GitHub Actions from a matching version tag, such as `v1.0.0`.
 
-## License
-
-ManagedCode.FileContext is licensed under the [MIT License](LICENSE).
+[MIT licensed](https://github.com/managedcode/FileContext/blob/main/LICENSE) · Built by [ManagedCode](https://github.com/managedcode)
