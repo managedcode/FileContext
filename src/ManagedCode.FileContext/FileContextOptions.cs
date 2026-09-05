@@ -3,6 +3,12 @@ namespace ManagedCode.FileContext;
 /// <summary>Controls file access, approval, search, and graph limits for one context provider.</summary>
 public sealed class FileContextOptions
 {
+    private static readonly TimeSpan MaximumOperationTimeout = TimeSpan.FromMilliseconds(uint.MaxValue - 1L);
+    private static readonly TimeSpan MaximumRegexTimeout = TimeSpan.FromMilliseconds(int.MaxValue - 1);
+
+    /// <summary>Gets or sets a cooperative deadline for each public file/context operation. Null disables the deadline.</summary>
+    public TimeSpan? OperationTimeout { get; set; }
+
     public string RootPrefix { get; set; } = string.Empty;
 
     public bool EnableWriteTools { get; set; }
@@ -60,9 +66,14 @@ public sealed class FileContextOptions
             throw new InvalidOperationException("The default range cannot exceed the maximum range.");
         }
 
-        if (RegexTimeout <= TimeSpan.Zero)
+        if (OperationTimeout is { } timeout && (timeout <= TimeSpan.Zero || timeout > MaximumOperationTimeout))
         {
-            throw new InvalidOperationException("The regex timeout must be greater than zero.");
+            throw new InvalidOperationException($"OperationTimeout must be positive and no greater than {MaximumOperationTimeout}, or null to disable it.");
+        }
+
+        if (RegexTimeout <= TimeSpan.Zero || RegexTimeout > MaximumRegexTimeout)
+        {
+            throw new InvalidOperationException("RegexTimeout must be positive and within the supported .NET regex timeout range.");
         }
     }
 

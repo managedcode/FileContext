@@ -7,6 +7,7 @@ The suite is integration-first:
 - dependency-injection tests resolve the actual default and keyed Agent Framework contracts;
 - end-to-end tests run Agent Framework function invocation against a real LlmTck HTTP replay service and verify every advertised read, list, grep, write, delete, replace, range, metadata, graph-search, and graph-export tool;
 - protocol tests inspect outgoing HTTP messages for matching call/result IDs after empty results, missing files, tool failures, mutations, and multiple calls with sequential or concurrent invocation enabled, including a subsequent request after session serialization/restoration;
+- timeout tests cover configured operation expiry, cancellation of every public operation, disabled deadlines, duration validation, and timeout tool results through restored sessions;
 - concurrent storage tests write and range-read eight independent files through one shared adapter/service;
 - a sparse 1 GiB filesystem test reads bounded line windows repeatedly, rejects full-file loading, caps allocations, and proves that an oversized line fails before it can be buffered in memory.
 

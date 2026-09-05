@@ -12,6 +12,7 @@ public sealed class FileContextConfigurationTests
         {
           "FileContext": {
             "RootPrefix": "configured",
+            "OperationTimeout": "00:00:10",
             "MaximumFullReadBytes": 8,
             "MaximumRangeReadBytes": 8,
             "DefaultRangeLineCount": 1,
@@ -46,6 +47,7 @@ public sealed class FileContextConfigurationTests
         var context = Resolve<IFileContext>(provider, keyed);
         var options = Resolve<FileContextOptions>(provider, keyed);
 
+        options.OperationTimeout.ShouldBe(TimeSpan.FromSeconds(10));
         options.RegexTimeout.ShouldBe(TimeSpan.FromMilliseconds(25));
         await AssertFileLimitsAsync(store, context);
         await AssertGraphLimitsAsync(store, context);

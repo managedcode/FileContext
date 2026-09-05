@@ -22,7 +22,8 @@ In scope: standard file access, bounded line navigation, metadata, Markdown grap
 12. Each graph operation builds from the current selected storage contents, so graph results cannot become stale between calls.
 13. The context provider injects capability instructions and tools, not arbitrary file content as system instructions.
 14. DI supports both the default `IStorage` and a named/keyed `IStorage` registration.
-15. The NuGet package has version `1.0.0`; publication occurs only from the GitHub Actions release workflow.
+15. Optional `OperationTimeout` applies to each public storage/context operation, combining with caller cancellation and preserving one deadline across internal steps. It defaults to null; regex matching has its separate `RegexTimeout`.
+16. The NuGet package has version `1.0.0`; publication occurs only from the GitHub Actions release workflow.
 
 ## Main flow
 
@@ -49,6 +50,7 @@ flowchart TD
 
 - Unsafe paths fail with `ArgumentException`; the storage provider is not called.
 - Missing files return `null` through the direct `AgentFileStore` and `IFileContext.GetInfoAsync` contracts; range reads throw `FileNotFoundException`. The `file_context_info` tool returns a structured `not_found` result with the logical path.
+- Configured operation deadlines produce `TimeoutException`; caller cancellation produces `OperationCanceledException`. Work is awaited cooperatively, including providers that do not stop promptly.
 - Storage failures become `IOException` values with the operation and safe logical path, preserving the provider's safe problem detail.
 - Invalid or catastrophic regex patterns fail deterministically; a regex timeout does not hang the agent invocation.
 - Oversized files, result sets, or graph exports stop at configured boundaries and report truncation or a clear limit failure.

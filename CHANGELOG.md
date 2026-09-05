@@ -4,6 +4,9 @@ All notable changes to ManagedCode.FileContext are documented here.
 
 ## Unreleased
 
+- Add optional OperationTimeout for all public storage/context operations, preserve caller cancellation, and report configured expiry as a tool-compatible timeout failure.
+- Validate operation and regex timeout durations at configuration time.
+
 - Automatically validate and release new package versions on pushes to main, including NuGet publication and GitHub tag/release creation; skip existing releases.
 - Document configuration of all file/graph limits and regex timeouts, including appsettings binding and caller-controlled operation deadlines.
 - Verify custom settings through default/keyed DI registrations and real regex timeout failures.

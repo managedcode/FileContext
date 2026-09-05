@@ -93,7 +93,21 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
         }
     }
 
-    private static async Task<string[]> RunToolLoopAsync(string replay, bool concurrent = false, string finalResponse = "Inspection completed.")
+    [Fact]
+    public async Task OperationTimeout_ReturnsToolErrorAndSurvivesSessionRestore()
+    {
+        var requests = await RunToolLoopAsync(
+            LlmTckToolReplay.CreateResponse("timeout", FileContextToolNames.ReadRange, "{\"path\":\"slow.txt\",\"startLine\":2}"),
+            operationTimeout: TimeSpan.FromMilliseconds(1));
+
+        foreach (var request in requests)
+        {
+            var results = LlmTckToolAssertions.AssertClosedCalls(request, "timeout");
+            results[0].GetProperty("content").GetString()!.ShouldContain("Error: Function failed.");
+        }
+    }
+
+    private static async Task<string[]> RunToolLoopAsync(string replay, bool concurrent = false, string finalResponse = "Inspection completed.", TimeSpan? operationTimeout = null)
     {
         const string prompt = "Inspect the files.";
         LlmTckToolReplay.Reset();
@@ -110,8 +124,13 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
         await store.WriteAsync("empty.txt", string.Empty).ConfigureAwait(false);
         await store.WriteAsync("first.txt", "first-content").ConfigureAwait(false);
         await store.WriteAsync("second.txt", "second-content").ConfigureAwait(false);
-        using var provider = new FileContextProvider(store, new FileContextService(store),
-            new FileContextOptions { RequireReadToolApproval = false });
+        if (operationTimeout is not null)
+        {
+            await store.WriteAsync("slow.txt", new string('a', 1_000_000)).ConfigureAwait(false);
+        }
+        var options = new FileContextOptions { RequireReadToolApproval = false, OperationTimeout = operationTimeout };
+        store = new ManagedCodeStorageFileStore(storage.Storage, options);
+        using var provider = new FileContextProvider(store, new FileContextService(store, options), options);
         var sdk = new OpenAIClient(new ApiKeyCredential("not-required-by-llm-tck"),
             new OpenAIClientOptions { Endpoint = LlmTckToolReplay.CreateRouteUri(host.Endpoint) });
         using var client = sdk.GetChatClient(FileContextAgentLlmTckTests.Model).AsIChatClient().AsBuilder()
@@ -119,6 +138,16 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
             .UseFunctionInvocation(configure: options => options.AllowConcurrentInvocation = concurrent).Build();
         var agent = new ChatClientAgent(client, new ChatClientAgentOptions { UseProvidedChatClientAsIs = true });
 
+        await RunSessionRoundTripAsync(agent, prompt, finalResponse).ConfigureAwait(false);
+        LlmTckToolReplay.RecordedRequests.Count.ShouldBe(3);
+        var assertions = await host.GetAssertionsAsync().ConfigureAwait(false);
+        assertions.Matched.ShouldBe(3);
+        assertions.Unmatched.ShouldBe(0);
+        return LlmTckToolReplay.RecordedRequests.Skip(1).ToArray();
+    }
+
+    private static async Task RunSessionRoundTripAsync(ChatClientAgent agent, string prompt, string finalResponse)
+    {
         var session = await agent.CreateSessionAsync().ConfigureAwait(false);
         var response = await agent.RunAsync(prompt, session).ConfigureAwait(false);
         response.Text.ShouldBe(finalResponse);
@@ -126,10 +155,5 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
         var restored = await agent.DeserializeSessionAsync(saved).ConfigureAwait(false);
         var followUp = await agent.RunAsync("Continue the inspection.", restored).ConfigureAwait(false);
         followUp.Text.ShouldBe("Follow-up completed.");
-        LlmTckToolReplay.RecordedRequests.Count.ShouldBe(3);
-        var assertions = await host.GetAssertionsAsync().ConfigureAwait(false);
-        assertions.Matched.ShouldBe(3);
-        assertions.Unmatched.ShouldBe(0);
-        return LlmTckToolReplay.RecordedRequests.Skip(1).ToArray();
     }
 }

@@ -93,6 +93,7 @@ internal sealed class StorageFileSearcher(
             while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
             {
                 lineNumber++;
+                cancellationToken.ThrowIfCancellationRequested();
                 if (regex.IsMatch(line))
                 {
                     matches.Add(new FileSearchMatch { LineNumber = lineNumber, Line = line });

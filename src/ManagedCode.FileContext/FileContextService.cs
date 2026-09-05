@@ -18,7 +18,20 @@ public sealed class FileContextService : IFileContext
         _options.Validate();
     }
 
-    public async Task<FileContextRange> ReadRangeAsync(
+    public Task<FileContextRange> ReadRangeAsync(
+        string path, int startLine = FileContextDefaults.FirstLineNumber, int? lineCount = null, CancellationToken cancellationToken = default)
+        => FileContextOperation.RunAsync(_options.OperationTimeout, token => ReadRangeOperationAsync(path, startLine, lineCount, token), cancellationToken);
+
+    public Task<FileContextInfo?> GetInfoAsync(string path, CancellationToken cancellationToken = default)
+        => FileContextOperation.RunAsync(_options.OperationTimeout, token => GetInfoOperationAsync(path, token), cancellationToken);
+
+    public Task<MarkdownGraphSearchResult> SearchMarkdownGraphAsync(string query, string directory = "", CancellationToken cancellationToken = default)
+        => FileContextOperation.RunAsync(_options.OperationTimeout, token => SearchMarkdownGraphOperationAsync(query, directory, token), cancellationToken);
+
+    public Task<MarkdownGraphExportResult> ExportMarkdownGraphAsync(MarkdownGraphFormat format, string directory = "", CancellationToken cancellationToken = default)
+        => FileContextOperation.RunAsync(_options.OperationTimeout, token => ExportMarkdownGraphOperationAsync(format, directory, token), cancellationToken);
+
+    private async Task<FileContextRange> ReadRangeOperationAsync(
         string path,
         int startLine = FileContextDefaults.FirstLineNumber,
         int? lineCount = null,
@@ -52,7 +65,7 @@ public sealed class FileContextService : IFileContext
         }
     }
 
-    public async Task<FileContextInfo?> GetInfoAsync(string path, CancellationToken cancellationToken = default)
+    private async Task<FileContextInfo?> GetInfoOperationAsync(string path, CancellationToken cancellationToken = default)
     {
         var metadata = await _fileStore.GetMetadataAsync(path, cancellationToken).ConfigureAwait(false);
         return metadata is null
@@ -60,7 +73,7 @@ public sealed class FileContextService : IFileContext
             : new FileContextInfo(path, metadata.Length, metadata.MimeType, metadata.LastModified);
     }
 
-    public async Task<MarkdownGraphSearchResult> SearchMarkdownGraphAsync(
+    private async Task<MarkdownGraphSearchResult> SearchMarkdownGraphOperationAsync(
         string query,
         string directory = "",
         CancellationToken cancellationToken = default)
@@ -83,7 +96,7 @@ public sealed class FileContextService : IFileContext
                 match.Score)).ToArray());
     }
 
-    public async Task<MarkdownGraphExportResult> ExportMarkdownGraphAsync(
+    private async Task<MarkdownGraphExportResult> ExportMarkdownGraphOperationAsync(
         MarkdownGraphFormat format,
         string directory = "",
         CancellationToken cancellationToken = default)

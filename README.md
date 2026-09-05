@@ -237,7 +237,8 @@ Paths are logical, relative, and `/`-separated. `RootPrefix` scopes storage acce
 | `MaximumSearchFiles` | 500 |
 | `MaximumSearchFileBytes` | 4 MiB |
 | `MaximumSearchResults` / `MaximumMatchesPerFile` | 100 / 20 |
-| `RegexTimeout` | 2 seconds |
+| `RegexTimeout` | 2 seconds per regex match |
+| `OperationTimeout` | `null` (no additional operation deadline) |
 | `MarkdownGlob` | `**/*.md` |
 | `MaximumMarkdownFiles` | 100 |
 | `MaximumMarkdownSourceBytes` | 1 MiB per file |
@@ -262,6 +263,7 @@ services.AddManagedCodeFileContext(storage, options =>
     options.MaximumSearchResults = 200;
     options.MaximumMatchesPerFile = 50;
     options.RegexTimeout = TimeSpan.FromSeconds(5);
+    options.OperationTimeout = TimeSpan.FromSeconds(30);
     options.MarkdownGlob = "docs/**/*.md";
     options.MaximumMarkdownFiles = 250;
     options.MaximumMarkdownSourceBytes = 2 * 1024 * 1024;
@@ -270,7 +272,7 @@ services.AddManagedCodeFileContext(storage, options =>
 });
 ```
 
-`RegexTimeout` is the only internal timeout. It limits **one regex match on one line**, protecting the process from excessive backtracking in a model-supplied pattern. It is not a two-second deadline for the whole search. Choose a finite positive value supported by .NET Regex. Size/count limits must be positive, and the default line count cannot exceed the maximum.
+`RegexTimeout` limits **one regex match on one line**, protecting the process from excessive backtracking in a model-supplied pattern. It is not a two-second deadline for the whole search. Choose a finite positive value supported by .NET Regex. Size/count limits must be positive, and the default line count cannot exceed the maximum.
 
 In a host that uses Microsoft configuration binding, the same options can come from `appsettings.json`, environment variables, or another configuration source:
 
@@ -295,6 +297,7 @@ The host supplies `configuration` and the `Microsoft.Extensions.Configuration.Bi
     "MaximumSearchResults": 200,
     "MaximumMatchesPerFile": 50,
     "RegexTimeout": "00:00:05",
+    "OperationTimeout": "00:00:30",
     "MarkdownGlob": "docs/**/*.md",
     "MaximumMarkdownFiles": 250,
     "MaximumMarkdownSourceBytes": 2097152,
@@ -304,7 +307,11 @@ The host supplies `configuration` and the `Microsoft.Extensions.Configuration.Bi
 }
 ```
 
-Options are bound at registration time; changing the configuration later does not automatically reconfigure an existing provider. For a deadline on an entire operation, pass a caller-controlled cancellation token:
+`OperationTimeout` sets a cooperative deadline for each public storage/context API call: read, write, delete, list, exists, search, directory creation, range, metadata, or Markdown graph search/export. It covers internal steps without restarting the timer. Set it to `null` to disable the additional deadline. A standard edit tool may make multiple API calls, each with its own deadline.
+
+Configured deadline expiry surfaces as `TimeoutException`, which the function-invocation loop can return as a tool error. Caller cancellation remains `OperationCanceledException`. Cancellation is cooperative: a provider that ignores the token or a synchronous regex/graph operation can finish later than the deadline; FileContext awaits the work and checks cancellation before returning a successful result. Regex matching retains its own `RegexTimeout`.
+
+Options are bound at registration time; changing the configuration later does not automatically reconfigure an existing provider. To set a per-call deadline or allow the caller to cancel earlier, pass a cancellation token:
 
 ```csharp
 using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -312,7 +319,7 @@ var results = await context.SearchMarkdownGraphAsync(
     "retry policy", "docs", cancellationToken: deadline.Token);
 ```
 
-Here, 30 seconds is the caller's example budget, not a library default. Storage-client and model-client timeouts belong to their respective host integrations.
+Here, 30 seconds is an example budget, not a library default. The configured operation deadline and caller token are combined; whichever cancels first takes effect. Storage-client and model-client timeouts belong to their respective host integrations.
 
 ## Verified with real integrations
 

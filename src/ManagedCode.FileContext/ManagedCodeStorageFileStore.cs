@@ -20,7 +20,29 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
         _paths = new StoragePathScope(_options.RootPrefix);
     }
 
-    public override async Task WriteAsync(string path, string content, CancellationToken cancellationToken = default)
+    public override Task WriteAsync(string path, string content, CancellationToken cancellationToken = default)
+        => FileContextOperation.RunAsync(_options.OperationTimeout, token => WriteOperationAsync(path, content, token), cancellationToken);
+
+    public override Task<string?> ReadAsync(string path, CancellationToken cancellationToken = default)
+        => FileContextOperation.RunAsync(_options.OperationTimeout, token => ReadOperationAsync(path, token), cancellationToken);
+
+    public override Task<bool> DeleteAsync(string path, CancellationToken cancellationToken = default)
+        => FileContextOperation.RunAsync(_options.OperationTimeout, token => DeleteOperationAsync(path, token), cancellationToken);
+
+    public override Task<IReadOnlyList<FileStoreEntry>> ListChildrenAsync(string directory, CancellationToken cancellationToken = default)
+        => FileContextOperation.RunAsync(_options.OperationTimeout, token => ListChildrenOperationAsync(directory, token), cancellationToken);
+
+    public override Task<bool> FileExistsAsync(string path, CancellationToken cancellationToken = default)
+        => FileContextOperation.RunAsync(_options.OperationTimeout, token => FileExistsOperationAsync(path, token), cancellationToken);
+
+    public override Task<IReadOnlyList<FileSearchResult>> SearchAsync(
+        string directory, string regexPattern, string? globPattern = null, bool recursive = false, CancellationToken cancellationToken = default)
+        => FileContextOperation.RunAsync(_options.OperationTimeout, token => SearchOperationAsync(directory, regexPattern, globPattern, recursive, token), cancellationToken);
+
+    public override Task CreateDirectoryAsync(string path, CancellationToken cancellationToken = default)
+        => FileContextOperation.RunAsync(_options.OperationTimeout, token => CreateDirectoryOperationAsync(path, token), cancellationToken);
+
+    private async Task WriteOperationAsync(string path, string content, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(content);
         var storagePath = _paths.ToStoragePath(path);
@@ -31,7 +53,7 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
         StorageResult.EnsureSuccess(result, $"write {path}");
     }
 
-    public override async Task<string?> ReadAsync(string path, CancellationToken cancellationToken = default)
+    private async Task<string?> ReadOperationAsync(string path, CancellationToken cancellationToken = default)
     {
         var storagePath = _paths.ToStoragePath(path);
         if (!await ExistsCoreAsync(storagePath, cancellationToken).ConfigureAwait(false))
@@ -52,7 +74,7 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
         }
     }
 
-    public override async Task<bool> DeleteAsync(string path, CancellationToken cancellationToken = default)
+    private async Task<bool> DeleteOperationAsync(string path, CancellationToken cancellationToken = default)
     {
         var storagePath = _paths.ToStoragePath(path);
         var result = await _storage.DeleteAsync(storagePath, cancellationToken).ConfigureAwait(false);
@@ -60,7 +82,7 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
         return result.Value;
     }
 
-    public override async Task<IReadOnlyList<FileStoreEntry>> ListChildrenAsync(
+    private async Task<IReadOnlyList<FileStoreEntry>> ListChildrenOperationAsync(
         string directory,
         CancellationToken cancellationToken = default)
     {
@@ -91,12 +113,12 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
             .ToArray();
     }
 
-    public override Task<bool> FileExistsAsync(string path, CancellationToken cancellationToken = default)
+    private Task<bool> FileExistsOperationAsync(string path, CancellationToken cancellationToken = default)
     {
         return ExistsCoreAsync(_paths.ToStoragePath(path), cancellationToken);
     }
 
-    public override Task<IReadOnlyList<FileSearchResult>> SearchAsync(
+    private Task<IReadOnlyList<FileSearchResult>> SearchOperationAsync(
         string directory,
         string regexPattern,
         string? globPattern = null,
@@ -105,7 +127,7 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
         => new StorageFileSearcher(this, _options)
             .SearchAsync(directory, regexPattern, globPattern, recursive, cancellationToken);
 
-    public override Task CreateDirectoryAsync(string path, CancellationToken cancellationToken = default)
+    private Task CreateDirectoryOperationAsync(string path, CancellationToken cancellationToken = default)
     {
         _ = _paths.ToStoragePath(path, allowEmpty: true);
         cancellationToken.ThrowIfCancellationRequested();
