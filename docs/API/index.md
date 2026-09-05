@@ -10,3 +10,9 @@ The primary entry points are:
 - `AddKeyedManagedCodeFileContext(...)` — bind the context services to a keyed `IStorage` registration.
 
 See the repository [README](../../README.md) for compiled usage examples. XML documentation is shipped with the NuGet package.
+
+## Configuration
+
+All `FileContextOptions` size/count limits and `RegexTimeout` can be set with the `configure` callback on either `AddManagedCodeFileContext` or `AddKeyedManagedCodeFileContext`. A host may bind an `IConfiguration` section in that callback using `Microsoft.Extensions.Configuration.Binder`; binding happens at registration time.
+
+`RegexTimeout` applies per regex match against one line. Other operations accept a caller-supplied `CancellationToken` for cancellation/deadlines. Provider/model timeouts belong to the host's corresponding client settings. See the [README configuration examples](../../README.md#configure-limits-and-timeouts).

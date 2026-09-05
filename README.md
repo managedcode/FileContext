@@ -246,6 +246,74 @@ Paths are logical, relative, and `/`-separated. `RootPrefix` scopes storage acce
 
 These settings are available through `FileContextOptions`; their named defaults are exposed by `FileContextDefaults`. Credentials, container lifecycle, authorization, and session persistence remain host responsibilities. When saving conversations, preserve tool-call/result pairs and handle interrupted turns before replaying history.
 
+### Configure limits and timeouts
+
+Every option in the table is configurable through `FileContextOptions`, for both default and keyed registrations. Configure the options before building your service provider:
+
+```csharp
+services.AddManagedCodeFileContext(storage, options =>
+{
+    options.MaximumFullReadBytes = 4 * 1024 * 1024;
+    options.MaximumRangeReadBytes = 512 * 1024;
+    options.DefaultRangeLineCount = 100;
+    options.MaximumRangeLineCount = 2000;
+    options.MaximumSearchFiles = 1000;
+    options.MaximumSearchFileBytes = 8 * 1024 * 1024;
+    options.MaximumSearchResults = 200;
+    options.MaximumMatchesPerFile = 50;
+    options.RegexTimeout = TimeSpan.FromSeconds(5);
+    options.MarkdownGlob = "docs/**/*.md";
+    options.MaximumMarkdownFiles = 250;
+    options.MaximumMarkdownSourceBytes = 2 * 1024 * 1024;
+    options.MaximumGraphResults = 50;
+    options.MaximumGraphExportCharacters = 400000;
+});
+```
+
+`RegexTimeout` is the only internal timeout. It limits **one regex match on one line**, protecting the process from excessive backtracking in a model-supplied pattern. It is not a two-second deadline for the whole search. Choose a finite positive value supported by .NET Regex. Size/count limits must be positive, and the default line count cannot exceed the maximum.
+
+In a host that uses Microsoft configuration binding, the same options can come from `appsettings.json`, environment variables, or another configuration source:
+
+```csharp
+using Microsoft.Extensions.Configuration;
+
+services.AddManagedCodeFileContext(storage, options =>
+    configuration.GetSection("FileContext").Bind(options));
+```
+
+The host supplies `configuration` and the `Microsoft.Extensions.Configuration.Binder` package. For example:
+
+```json
+{
+  "FileContext": {
+    "MaximumFullReadBytes": 4194304,
+    "MaximumRangeReadBytes": 524288,
+    "DefaultRangeLineCount": 100,
+    "MaximumRangeLineCount": 2000,
+    "MaximumSearchFiles": 1000,
+    "MaximumSearchFileBytes": 8388608,
+    "MaximumSearchResults": 200,
+    "MaximumMatchesPerFile": 50,
+    "RegexTimeout": "00:00:05",
+    "MarkdownGlob": "docs/**/*.md",
+    "MaximumMarkdownFiles": 250,
+    "MaximumMarkdownSourceBytes": 2097152,
+    "MaximumGraphResults": 50,
+    "MaximumGraphExportCharacters": 400000
+  }
+}
+```
+
+Options are bound at registration time; changing the configuration later does not automatically reconfigure an existing provider. For a deadline on an entire operation, pass a caller-controlled cancellation token:
+
+```csharp
+using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+var results = await context.SearchMarkdownGraphAsync(
+    "retry policy", "docs", cancellationToken: deadline.Token);
+```
+
+Here, 30 seconds is the caller's example budget, not a library default. Storage-client and model-client timeouts belong to their respective host integrations.
+
 ## Verified with real integrations
 
 The suite runs against real filesystem storage, real Markdown graph builds, and an in-process LlmTck HTTP service using Agent Framework's actual function-invocation pipeline. No live model or API key is required.
@@ -274,6 +342,6 @@ dotnet pack src/ManagedCode.FileContext/ManagedCode.FileContext.csproj --configu
 
 ## Releases and license
 
-Version `1.0.0` is defined centrally in `Directory.Build.props`. NuGet publication runs only through GitHub Actions from a matching version tag, such as `v1.0.0`.
+Version `1.0.0` is defined centrally in `Directory.Build.props`. Every push to `main` runs the Release workflow: restore, format, build, test with coverage, and pack. For a new package version, it publishes the validated NuGet artifact and creates the matching tag and GitHub release automatically. Already released versions are skipped. To release an update, bump the version, commit, and push; no manual tag is required.
 
 [MIT licensed](https://github.com/managedcode/FileContext/blob/main/LICENSE) · Built by [ManagedCode](https://github.com/managedcode)

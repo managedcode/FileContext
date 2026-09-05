@@ -21,4 +21,4 @@ The coverage command inherits its OpenCover output path and 95% total line thres
 
 Static analysis runs as part of every build. The SDK analyzers, Roslynator, Meziantou.Analyzer, and SonarAnalyzer.CSharp are centrally pinned and warnings are errors. Sonar rules `S109` and `S1192` additionally enforce named semantic numbers and repeated strings in product code; ordinary control-flow values such as zero/one and one-off messages remain inline when a constant would obscure intent.
 
-NuGet publication is intentionally absent from local commands. The tag-driven GitHub Actions release workflow is the only publisher.
+NuGet publication is intentionally absent from local commands. The GitHub Actions Release workflow runs on pushes to `main` and is the only publisher. It validates and packs the exact commit, publishes new versions, then creates their tags and GitHub releases. An existing published release skips publication. A failed publish fails the workflow; an existing unreleased tag pointing to another commit is rejected. The workflow can also be retried manually on `main`.

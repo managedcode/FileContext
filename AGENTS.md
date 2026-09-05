@@ -32,7 +32,7 @@ Tests use xUnit over VSTest. NuGet versions are centrally managed in `Directory.
 - Define in-scope and out-of-scope behavior in a root `*.plan.md` before non-trivial changes.
 - Implement tests and production behavior together.
 - Verify focused tests, the full suite, coverage, format, build, and finally pack.
-- Direct local NuGet publication is forbidden. Releases run only through GitHub Actions from an explicit version tag.
+- Direct local NuGet publication is forbidden. Pushes to main run the Release workflow, which validates the package and automatically publishes new versions with a matching version tag and GitHub release.
 - Remove temporary root plan files after local completion.
 
 ## Boundaries

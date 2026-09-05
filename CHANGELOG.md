@@ -2,6 +2,12 @@
 
 All notable changes to ManagedCode.FileContext are documented here.
 
+## Unreleased
+
+- Automatically validate and release new package versions on pushes to main, including NuGet publication and GitHub tag/release creation; skip existing releases.
+- Document configuration of all file/graph limits and regex timeouts, including appsettings binding and caller-controlled operation deadlines.
+- Verify custom settings through default/keyed DI registrations and real regex timeout failures.
+
 ## 1.0.0 - 2026-09-05
 
 - Prepare the 1.0.0 package with a refreshed README covering setup, agent integration, metadata results, Markdown graphs, concurrency, and operational limits.

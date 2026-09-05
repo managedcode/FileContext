@@ -27,6 +27,7 @@ public sealed class FileContextOptions
 
     public int MaximumMatchesPerFile { get; set; } = FileContextDefaults.MaximumMatchesPerFile;
 
+    /// <summary>Gets or sets the finite timeout for one regex match against one line, not the entire search.</summary>
     public TimeSpan RegexTimeout { get; set; } = TimeSpan.FromSeconds(FileContextDefaults.RegexTimeoutSeconds);
 
     public string MarkdownGlob { get; set; } = FileContextDefaults.MarkdownGlob;

@@ -92,4 +92,4 @@ Independent writes and range reads on eight different files are tested concurren
 - All rules have automated coverage at the highest useful boundary.
 - Formatting, Release build, full tests, at least 95% product line coverage, package validation, and clean-install smoke checks pass locally.
 - README and durable docs describe only the implemented API.
-- GitHub Actions validates `main` and publishes NuGet only from an explicit matching version tag.
+- GitHub Actions validates each push to `main`, automatically publishes new package versions, and creates the matching version tags and GitHub releases. Existing releases are skipped.
