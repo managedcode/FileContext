@@ -3,6 +3,7 @@ namespace ManagedCode.FileContext;
 /// <summary>Default limits and selectors used by <see cref="FileContextOptions" />.</summary>
 public static class FileContextDefaults
 {
+    public const long MaximumGeneratedFileBytes = 64L * 1024L * 1024L;
     public const int FirstLineNumber = 1;
     public const long MaximumFullReadBytes = 1_024 * 1_024;
     public const long MaximumRangeReadBytes = 256 * 1_024;

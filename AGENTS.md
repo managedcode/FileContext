@@ -66,6 +66,8 @@ Document any justified exception in the nearest feature doc or ADR.
 
 ## Critical rules
 
+- Runtime dependencies must be free for commercial use without paid binary maintenance agreements or a second commercial license. MIT, Apache-2.0, BSD and OFL are acceptable; inspect the shipped NuGet license and transitive dependencies.
+
 - Never commit secrets or generated test artifacts.
 - Never weaken or delete a test to make a run green.
 - Never push a package directly from a developer machine.

@@ -86,3 +86,17 @@ All potentially large operations are controlled by `FileContextOptions`: full-re
 - Setup: [development setup](Development/setup.md)
 - Safety model: [security](Security.md)
 - Verification: [testing](Testing/index.md)
+
+## Generated documents
+
+`FileContextDocumentService` shares `ManagedCodeStorageFileStore` with standard navigation and bounded reads. It creates new UTF-8 text/CSV, XLSX workbooks and paginated PDF documents under unique relative paths. `FileContextDocumentTools` supplies the same native functions to FileContextProvider or a host-owned tool registry.
+
+```mermaid
+flowchart LR
+  Provider[FileContextProvider] --> Tools[FileContextDocumentTools]
+  Host[Host native and JavaScript tools] --> Tools
+  Tools --> Documents[FileContextDocumentService]
+  Documents --> Writers[CSV OpenXml PdfPig]
+  Documents --> Store[ManagedCodeStorageFileStore]
+  Store --> Storage[IStorage]
+```

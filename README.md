@@ -352,3 +352,32 @@ dotnet pack src/ManagedCode.FileContext/ManagedCode.FileContext.csproj --configu
 Version `1.0.0` is defined centrally in `Directory.Build.props`. Every push to `main` runs the Release workflow: restore, format, build, test with coverage, and pack. For a new package version, it publishes the validated NuGet artifact and creates the matching tag and GitHub release automatically. Already released versions are skipped. To release an update, bump the version, commit, and push; no manual tag is required.
 
 [MIT licensed](https://github.com/managedcode/FileContext/blob/main/LICENSE) · Built by [ManagedCode](https://github.com/managedcode)
+
+## Create text, CSV, Excel and PDF
+
+Version 1.0.1 adds native document tools to the same scoped FileContext used for reads, listing and metadata. Set `EnableWriteTools = true` on the shared options passed to the store, service and provider. Creation tools retain human approval by default. Each result has a unique `outputs/<id>/<name>` path, content type and byte length; creation never overwrites another file. Hosts own download URLs and user authorization.
+
+```csharp
+var options = new FileContextOptions
+{
+    RootPrefix = "conversations/current",
+    EnableWriteTools = true
+};
+var store = new ManagedCodeStorageFileStore(storage, options);
+var context = new FileContextService(store, options);
+var report = await context.Documents.CreateWorkbookAsync("report.xlsx",
+    new FileContextWorkbook([
+        new FileContextWorksheet("Sales", [
+            [new(Text: "Product"), new(Text: "Count")],
+            [new(Text: "Glasses"), new(Number: 12)]
+        ])
+    ]));
+var info = await context.GetInfoAsync(report.Path);
+await using var bytes = await store.OpenReadAsync(report.Path);
+```
+
+`FileContextProvider` exposes `file_context_create_text`, `file_context_create_csv`, `file_context_create_workbook`, and `file_context_create_pdf` when writes are enabled. `FileContextDocumentTools.Create(store, options)` returns those same native functions for host-managed tool registries, including sandboxed JavaScript bridges.
+
+CSV preserves literal values and escapes quotes, delimiters and newlines. XLSX supports multiple sheets and text/number/boolean/formula cells; Excel calculates explicit formulas when opened. PDF supports paginated paragraphs and a title with embedded Noto Sans for Latin/Cyrillic text. The Noto Sans font is distributed under the bundled SIL Open Font License. The default generated-file budget is 64 MiB, configurable through `MaximumGeneratedFileBytes`; cancellation and `OperationTimeout` apply to generation and persistence.
+
+Document generation uses DocumentFormat.OpenXml (MIT), PdfPig (Apache-2.0), and bundled Noto Sans (OFL-1.1). CSV writing uses the .NET runtime. These components do not require a paid commercial license. See [dependency licenses](docs/Development/dependency-licenses.md) for the audited package boundary and font notice.

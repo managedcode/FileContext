@@ -10,10 +10,16 @@
 
   <ItemGroup>
     <PackageReference Include="ManagedCode.MarkdownLd.Kb" />
+    <PackageReference Include="DocumentFormat.OpenXml" />
+    <PackageReference Include="PdfPig" />
     <PackageReference Include="ManagedCode.Storage.Core" />
     <PackageReference Include="Microsoft.Agents.AI" />
     <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Documents/Assets/NotoSans-Regular.ttf" />
+    <None Include="Documents/Assets/OFL.txt" Pack="true" PackagePath="licenses/NotoSans-OFL.txt" />
   </ItemGroup>
 </Project>

@@ -3,6 +3,10 @@ namespace ManagedCode.FileContext;
 /// <summary>Provides bounded file navigation, metadata, and Markdown graph operations.</summary>
 public interface IFileContext
 {
+    FileContextDocumentService Documents { get; }
+
+    Task<IReadOnlyList<FileContextInfo>> ListFilesAsync(string directory = "", CancellationToken cancellationToken = default);
+
     Task<FileContextRange> ReadRangeAsync(
         string path,
         int startLine = FileContextDefaults.FirstLineNumber,

@@ -20,6 +20,16 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
         _paths = new StoragePathScope(_options.RootPrefix);
     }
 
+    /// <summary>Creates a uniquely named binary file. The stream remains owned by the caller.</summary>
+    public Task<FileContextCreatedFile> CreateFileAsync(string fileName, Stream content, string mediaType,
+        long? maximumBytes = null, CancellationToken cancellationToken = default)
+    {
+        if (!_options.EnableWriteTools) { throw new InvalidOperationException("File creation requires EnableWriteTools."); }
+        return FileContextOperation.RunAsync(_options.OperationTimeout,
+            token => new StorageFileCreator(_storage, _paths).CreateAsync(fileName, content, mediaType,
+                Math.Min(maximumBytes ?? _options.MaximumGeneratedFileBytes, _options.MaximumGeneratedFileBytes), token), cancellationToken);
+    }
+
     public override Task WriteAsync(string path, string content, CancellationToken cancellationToken = default)
         => FileContextOperation.RunAsync(_options.OperationTimeout, token => WriteOperationAsync(path, content, token), cancellationToken);
 
@@ -134,7 +144,7 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
         return Task.CompletedTask;
     }
 
-    internal async Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken)
+    public async Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
     {
         return await OpenReadCoreAsync(_paths.ToStoragePath(path), cancellationToken).ConfigureAwait(false);
     }

@@ -95,3 +95,20 @@ Independent writes and range reads on eight different files are tested concurren
 - Formatting, Release build, full tests, at least 95% product line coverage, package validation, and clean-install smoke checks pass locally.
 - README and durable docs describe only the implemented API.
 - GitHub Actions validates each push to `main`, automatically publishes new package versions, and creates the matching version tags and GitHub releases. Existing releases are skipped.
+
+## Generated documents
+
+The shared store and `IFileContext.Documents` create unique text/CSV/XLSX/PDF outputs. Standard listing, metadata, range reads and host streaming access use their returned paths. The document tool factory and context provider share the same implementations; hosts may register a selected subset in a native or JavaScript tool catalog. Writes must be explicitly enabled on shared options and human approval is enabled by default.
+
+```mermaid
+sequenceDiagram
+  participant Agent
+  participant Tools as FileContext document tools
+  participant Store as Scoped file store
+  Agent->>Tools: Create workbook / CSV / PDF / text
+  Tools->>Store: Persist new outputs/id/name
+  Store-->>Agent: Relative path and metadata
+  Agent->>Store: List / info / read the same path
+```
+
+Verification: DocumentCreationTests and DocumentValidationTests reopen real formats and test boundary failures; FileDocumentCreationLlmTckTests exercises CSV/XLSX/PDF through real model tool calls and checks closed call/result history.

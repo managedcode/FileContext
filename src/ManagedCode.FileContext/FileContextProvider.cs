@@ -35,7 +35,8 @@ public sealed class FileContextProvider : AIContextProvider, IDisposable
             DisableReadOnlyToolApproval = !effectiveOptions.RequireReadToolApproval,
             DisableWriteToolApproval = !effectiveOptions.RequireWriteToolApproval,
         });
-        _tools = CreateTools(fileContext, effectiveOptions.RequireReadToolApproval);
+        _tools = CreateTools(fileContext, effectiveOptions.RequireReadToolApproval)
+            .Concat(FileContextDocumentTools.Create(fileStore, effectiveOptions)).ToArray();
     }
 
     protected override async ValueTask<AIContext> InvokingCoreAsync(

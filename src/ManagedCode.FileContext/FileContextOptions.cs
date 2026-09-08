@@ -13,6 +13,8 @@ public sealed class FileContextOptions
 
     public bool EnableWriteTools { get; set; }
 
+    public long MaximumGeneratedFileBytes { get; set; } = FileContextDefaults.MaximumGeneratedFileBytes;
+
     public bool RequireReadToolApproval { get; set; } = true;
 
     public bool RequireWriteToolApproval { get; set; } = true;
@@ -48,6 +50,7 @@ public sealed class FileContextOptions
 
     internal void Validate()
     {
+        ValidatePositive(MaximumGeneratedFileBytes, nameof(MaximumGeneratedFileBytes));
         ValidatePositive(MaximumFullReadBytes, nameof(MaximumFullReadBytes));
         ValidatePositive(MaximumRangeReadBytes, nameof(MaximumRangeReadBytes));
         ValidatePositive(DefaultRangeLineCount, nameof(DefaultRangeLineCount));

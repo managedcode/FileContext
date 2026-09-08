@@ -5,7 +5,7 @@ using Microsoft.Extensions.FileSystemGlobbing;
 namespace ManagedCode.FileContext;
 
 /// <summary>Implements bounded file operations and Markdown knowledge-graph materialization.</summary>
-public sealed class FileContextService : IFileContext
+public sealed partial class FileContextService : IFileContext
 {
     private readonly ManagedCodeStorageFileStore _fileStore;
     private readonly FileContextOptions _options;
@@ -16,7 +16,10 @@ public sealed class FileContextService : IFileContext
         _fileStore = fileStore ?? throw new ArgumentNullException(nameof(fileStore));
         _options = options ?? new FileContextOptions();
         _options.Validate();
+        Documents = new FileContextDocumentService(_fileStore, _options);
     }
+
+    public FileContextDocumentService Documents { get; }
 
     public Task<FileContextRange> ReadRangeAsync(
         string path, int startLine = FileContextDefaults.FirstLineNumber, int? lineCount = null, CancellationToken cancellationToken = default)

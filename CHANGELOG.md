@@ -2,7 +2,12 @@
 
 All notable changes to ManagedCode.FileContext are documented here.
 
-## Unreleased
+## 1.0.1
+
+- Add scoped creation of text, CSV, XLSX workbooks and Unicode PDF documents.
+- Expose native document tools through FileContextProvider and a reusable function factory, with write opt-in and approval defaults.
+- Add public streaming access and bounded recursive file metadata listing, preserving the same path scope as existing reads.
+
 
 - Add optional OperationTimeout for all public storage/context operations, preserve caller cancellation, and report configured expiry as a tool-compatible timeout failure.
 - Validate operation and regex timeout durations at configuration time.
