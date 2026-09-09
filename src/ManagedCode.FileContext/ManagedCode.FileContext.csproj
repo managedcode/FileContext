@@ -11,6 +11,7 @@
   <ItemGroup>
     <PackageReference Include="ManagedCode.MarkdownLd.Kb" />
     <PackageReference Include="DocumentFormat.OpenXml" />
+    <PackageReference Include="ManagedCode.Storage.FileSystem" />
     <PackageReference Include="PdfPig" />
     <PackageReference Include="ManagedCode.Storage.Core" />
     <PackageReference Include="Microsoft.Agents.AI" />

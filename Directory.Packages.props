@@ -4,7 +4,7 @@
     <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup>
-    <GlobalPackageReference Include="Meziantou.Analyzer" Version="3.0.203" PrivateAssets="all" />
+    <GlobalPackageReference Include="Meziantou.Analyzer" Version="3.0.231" PrivateAssets="all" />
     <GlobalPackageReference Include="Roslynator.Analyzers" Version="5.0.0" PrivateAssets="all" />
     <GlobalPackageReference Include="SonarAnalyzer.CSharp" Version="10.33.0.1635" PrivateAssets="all" />
   </ItemGroup>
@@ -14,24 +14,24 @@
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <PackageVersion Include="coverlet.msbuild" Version="10.0.1" />
     <PackageVersion Include="DotNet.ReproducibleBuilds" Version="2.0.5" />
-    <PackageVersion Include="ManagedCode.LlmTck" Version="0.1.0" />
-    <PackageVersion Include="ManagedCode.LlmTck.Client" Version="0.1.0" />
-    <PackageVersion Include="ManagedCode.LlmTck.Hosting" Version="0.1.0" />
-    <PackageVersion Include="ManagedCode.LlmTck.OpenAI" Version="0.1.0" />
+    <PackageVersion Include="ManagedCode.LlmTck" Version="0.1.2" />
+    <PackageVersion Include="ManagedCode.LlmTck.Client" Version="0.1.2" />
+    <PackageVersion Include="ManagedCode.LlmTck.Hosting" Version="0.1.2" />
+    <PackageVersion Include="ManagedCode.LlmTck.OpenAI" Version="0.1.2" />
     <PackageVersion Include="ManagedCode.MarkdownLd.Kb" Version="0.2.9" />
-    <PackageVersion Include="ManagedCode.Storage.Core" Version="10.0.7" />
-    <PackageVersion Include="ManagedCode.Storage.FileSystem" Version="10.0.7" />
+    <PackageVersion Include="ManagedCode.Storage.Core" Version="10.0.8" />
+    <PackageVersion Include="ManagedCode.Storage.FileSystem" Version="10.0.8" />
     <PackageVersion Include="Microsoft.Agents.AI" Version="1.20.0" />
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.9.0" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.9.0" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.11" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
-    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.400" />
-    <PackageVersion Include="OpenAI" Version="2.12.0" />
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.401" />
+    <PackageVersion Include="OpenAI" Version="2.13.0" />
     <PackageVersion Include="Shouldly" Version="4.3.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
