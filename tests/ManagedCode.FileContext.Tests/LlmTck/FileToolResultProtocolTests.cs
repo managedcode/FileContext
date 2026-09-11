@@ -57,6 +57,26 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
         }
     }
 
+    [Fact]
+    public async Task ReadingGuidance_ReachesModelAndRestoredSession()
+    {
+        var requests = await RunToolLoopAsync(LlmTckToolReplay.CreateResponse(
+            "metadata", FileContextToolNames.GetInfo, "{\"path\":\"first.txt\"}"));
+
+        foreach (var request in requests)
+        {
+            using var document = JsonDocument.Parse(request);
+            var instructions = string.Join("\n", document.RootElement.GetProperty("messages").EnumerateArray()
+                .Where(message => message.GetProperty("role").GetString() is "system" or "developer")
+                .Select(message => message.GetProperty("content").ToString()));
+            instructions.ShouldContain("length in bytes");
+            instructions.ShouldContain("Do not read an entire large file into model context by default");
+            instructions.ShouldContain(FileAccessProvider.GrepToolName);
+            instructions.ShouldContain(FileContextToolNames.ReadRange);
+            instructions.ShouldContain("do not silently omit remaining content");
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

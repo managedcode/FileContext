@@ -381,3 +381,7 @@ await using var bytes = await store.OpenReadAsync(report.Path);
 CSV preserves literal values and escapes quotes, delimiters and newlines. XLSX supports multiple sheets and text/number/boolean/formula cells; Excel calculates explicit formulas when opened. PDF supports paginated paragraphs and a title with embedded Noto Sans for Latin/Cyrillic text. The Noto Sans font is distributed under the bundled SIL Open Font License. The default generated-file budget is 64 MiB, configurable through `MaximumGeneratedFileBytes`; cancellation and `OperationTimeout` apply to generation and persistence.
 
 Document generation uses DocumentFormat.OpenXml (MIT), PdfPig (Apache-2.0), and bundled Noto Sans (OFL-1.1). CSV writing uses the .NET runtime. These components do not require a paid commercial license. See [dependency licenses](docs/Development/dependency-licenses.md) for the audited package boundary and font notice.
+
+### Reading large files
+
+Use `file_context_info` first: it returns the exact byte length, content type and modification time without loading file contents. Search for relevant text, then request the needed line ranges. The context provider supplies this guidance to the model on invocation. Full reads remain available when the task requires complete contents; exhaustive processing should advance through ranges without omitting data or rereading unchanged ranges. Byte length is not a token count.

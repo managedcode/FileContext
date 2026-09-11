@@ -35,6 +35,8 @@ Tests use xUnit over VSTest. NuGet versions are centrally managed in `Directory.
 - Direct local NuGet publication is forbidden. Pushes to main run the Release workflow, which validates the package and automatically publishes new versions with a matching version tag and GitHub release.
 - Remove temporary root plan files after local completion.
 
+- Agents must inspect file metadata before choosing a read strategy, search for relevant content and read needed ranges instead of loading large files into model context by default. Preserve complete-file access when explicitly needed.
+
 ## Boundaries
 
 - `ManagedCode.Storage.Core.IStorage` is the only storage contract the product package may require.
