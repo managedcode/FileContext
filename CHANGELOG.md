@@ -2,6 +2,11 @@
 
 All notable changes to ManagedCode.FileContext are documented here.
 
+## 1.0.3
+
+- Add read-only native XLSX worksheet metadata and sparse cell-range tools, with stored types, exact coordinates and cached formula results.
+- Preserve scoped storage, read approvals, cancellation and source/output budgets; verify native reads through the actual agent tool loop.
+
 ## 1.0.1
 
 - Add scoped creation of text, CSV, XLSX workbooks and Unicode PDF documents.

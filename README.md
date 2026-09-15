@@ -385,3 +385,15 @@ Document generation uses DocumentFormat.OpenXml (MIT), PdfPig (Apache-2.0), and 
 ### Reading large files
 
 Use `file_context_info` first: it returns the exact byte length, content type and modification time without loading file contents. Search for relevant text, then request the needed line ranges. The context provider supplies this guidance to the model on invocation. Full reads remain available when the task requires complete contents; exhaustive processing should advance through ranges without omitting data or rereading unchanged ranges. Byte length is not a token count.
+
+### Native Excel reads
+
+Read-only contexts also expose `file_context_workbook_info` and `file_context_workbook_range`.
+Use `context.Documents.GetWorkbookInfoAsync(path)` to discover worksheet names, then
+`context.Documents.ReadWorkbookRangeAsync(path, sheet, startRow, rowCount, startColumn, columnCount)`.
+Rows and columns are one-based. Range results are sparse: absent cell coordinates are blank.
+Values retain stored numeric precision and text leading zeros. Formula text and the saved cached
+result are returned without evaluation; cached results may be absent or stale. Excel display
+formatting is not applied. These tools use the same relative-path scope, read approval policy,
+cancellation and configured source/range byte budgets as other reads. XLSX files must be present
+in the scoped store; text extraction is not required for these native reads.

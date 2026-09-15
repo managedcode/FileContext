@@ -100,3 +100,18 @@ flowchart LR
   Documents --> Store[ManagedCodeStorageFileStore]
   Store --> Storage[IStorage]
 ```
+
+## Native workbook reads
+
+`FileContextDocumentService` opens XLSX packages read-only from the scoped storage adapter.
+`FileContextWorkbookReader` maps worksheets and cell rectangles into package-owned result records.
+It preserves coordinates and stored types without evaluating formulas or accessing external links.
+
+```mermaid
+flowchart LR
+  Provider[FileContextProvider] --> Tools[Workbook metadata and range tools]
+  Tools --> Documents[FileContextDocumentService]
+  Documents --> Store[Scoped storage adapter]
+  Documents --> Reader[Read-only Open XML reader]
+  Reader --> Result[Sparse cells with coordinates and cached values]
+```

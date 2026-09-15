@@ -3,7 +3,7 @@ using System.Text;
 namespace ManagedCode.FileContext;
 
 /// <summary>Creates new documents in the same scoped file store used by navigation and reads.</summary>
-public sealed class FileContextDocumentService(ManagedCodeStorageFileStore store, FileContextOptions options)
+public sealed partial class FileContextDocumentService(ManagedCodeStorageFileStore store, FileContextOptions options)
 {
     public Task<FileContextCreatedFile> CreateTextAsync(string fileName, string text, CancellationToken cancellationToken = default)
     {

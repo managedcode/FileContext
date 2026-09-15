@@ -7,6 +7,8 @@ public static class FileContextToolNames
     public const string CreateCsv = "file_context_create_csv";
     public const string CreateWorkbook = "file_context_create_workbook";
     public const string CreatePdf = "file_context_create_pdf";
+    public const string WorkbookInfo = "file_context_workbook_info";
+    public const string WorkbookRange = "file_context_workbook_range";
     public const string ReadRange = "file_context_read_range";
     public const string GetInfo = "file_context_info";
     public const string SearchMarkdownGraph = "file_context_markdown_graph_search";
