@@ -2,6 +2,10 @@
 
 All notable changes to ManagedCode.FileContext are documented here.
 
+## 1.0.4
+
+- Reject XLSX in generic text reads and exclude it from text search; use native worksheet/cell tools without exposing binary bytes.
+
 ## 1.0.3
 
 - Add read-only native XLSX worksheet metadata and sparse cell-range tools, with stored types, exact coordinates and cached formula results.

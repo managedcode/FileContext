@@ -66,6 +66,7 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
     private async Task<string?> ReadOperationAsync(string path, CancellationToken cancellationToken = default)
     {
         var storagePath = _paths.ToStoragePath(path);
+        StorageTextPolicy.RequireText(path);
         if (!await ExistsCoreAsync(storagePath, cancellationToken).ConfigureAwait(false))
         {
             return null;

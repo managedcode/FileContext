@@ -68,7 +68,7 @@ internal sealed class StorageFileSearcher(
         BlobMetadata metadata,
         Matcher? matcher)
     {
-        if (metadata.Length > (ulong)options.MaximumSearchFileBytes
+        if (StorageTextPolicy.IsWorkbook(path) || metadata.Length > (ulong)options.MaximumSearchFileBytes
             || !StoragePathScope.TryGetRemainder(path, directory, out var relative))
         {
             return false;

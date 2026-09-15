@@ -397,3 +397,4 @@ result are returned without evaluation; cached results may be absent or stale. E
 formatting is not applied. These tools use the same relative-path scope, read approval policy,
 cancellation and configured source/range byte budgets as other reads. XLSX files must be present
 in the scoped store; text extraction is not required for these native reads.
+Generic text reads reject `.xlsx` files and text searches skip them, so the agent cannot accidentally receive ZIP bytes through a text tool.

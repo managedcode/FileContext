@@ -53,6 +53,7 @@ public sealed partial class FileContextService : IFileContext
                 $"Line count must be between {FileContextDefaults.FirstLineNumber} and {_options.MaximumRangeLineCount}.");
         }
 
+        StorageTextPolicy.RequireText(StoragePathScope.Normalize(path));
         if (await _fileStore.GetMetadataAsync(path, cancellationToken).ConfigureAwait(false) is null)
         {
             throw new FileNotFoundException($"File '{path}' was not found.", path);

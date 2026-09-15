@@ -71,6 +71,22 @@ public sealed class WorkbookReadingTests
         await Should.ThrowAsync<IOException>(() => context.Documents.GetWorkbookInfoAsync(created.Path));
     }
 
+    [Fact]
+    public async Task Generic_text_tools_do_not_expose_workbook_bytes()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { EnableWriteTools = true };
+        var store = new ManagedCodeStorageFileStore(scope.Storage, options);
+        var context = new FileContextService(store, options);
+        var workbook = await context.Documents.CreateWorkbookAsync("source.XLSX", new([new("Data", [[new(Text: "source value")]])]));
+        var text = await context.Documents.CreateTextAsync("notes.md", "source text");
+        await Should.ThrowAsync<InvalidOperationException>(() => store.ReadAsync(workbook.Path));
+        await Should.ThrowAsync<InvalidOperationException>(() => context.ReadRangeAsync(workbook.Path));
+        var matches = await store.SearchAsync("", ".", recursive: true);
+        matches.Select(match => match.FileName).ShouldBe([text.Path]);
+        (await context.Documents.ReadWorkbookRangeAsync(workbook.Path, "Data", 1, 1, 1, 1)).Cells[0].Value.ShouldBe("source value");
+    }
+
     private static void Rewrite(TestStorageScope scope, FileContextOptions options, string path)
     {
         var physical = Path.Combine(scope.Directory, options.RootPrefix, path);
