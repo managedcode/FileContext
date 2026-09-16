@@ -13,6 +13,7 @@ public sealed class FileDocumentCreationLlmTckTests
     private const string Response = "Created the requested document.";
 
     [Theory]
+    [InlineData(FileContextToolNames.TablesInfo)]
     [InlineData(FileContextToolNames.WorkbookInfo)]
     [InlineData(FileContextToolNames.WorkbookRange)]
     public async Task Agent_reads_native_workbooks_with_write_tools_disabled(string toolName)

@@ -398,3 +398,18 @@ formatting is not applied. These tools use the same relative-path scope, read ap
 cancellation and configured source/range byte budgets as other reads. XLSX files must be present
 in the scoped store; text extraction is not required for these native reads.
 Generic text reads reject `.xlsx` files and text searches skip them, so the agent cannot accidentally receive ZIP bytes through a text tool.
+
+### Table metadata for CSV and XLSX
+
+`await context.Documents.GetTablesInfoAsync(path, headerRow: null, delimiter: null)`
+returns ordered headers and nonempty data-row counts without returning data rows.
+The read-only agent tool is `file_context_tables_info`; it follows read approval settings.
+XLSX returns each named table (excluding its header and totals), or a worksheet summary
+when no named tables exist. Blank and duplicate headers retain column positions.
+CSV detects comma, semicolon, tab or pipe, or accepts an explicit single-character delimiter.
+Quoted multiline fields form one record; physically empty lines are skipped.
+The optional one-based headerRow selects a CSV logical record or worksheet row;
+otherwise the first nonempty record/row is the header. Named Excel tables own their headers.
+Empty files/sheets return no headers and zero rows. Formula cells count as data without evaluation.
+`FileContextTableReader.Read` exposes the same parser for a caller-owned seekable stream.
+Source and serialized-result budgets follow the configured full-read and range-read byte budgets.
