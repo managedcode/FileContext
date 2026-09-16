@@ -76,7 +76,7 @@ internal static class FileContextWorkbookReader
         return cells;
     }
 
-    private static FileContextWorkbookCell ReadCell(Cell cell, string[] strings, string address)
+    internal static FileContextWorkbookCell ReadCell(Cell cell, string[] strings, string address)
     {
         var type = cell.DataType?.Value;
         var value = cell.CellValue?.Text ?? string.Empty;
@@ -100,7 +100,7 @@ internal static class FileContextWorkbookReader
     private static WorkbookPart RequireWorkbook(SpreadsheetDocument document) =>
         document.WorkbookPart ?? throw new InvalidDataException("The package has no Excel workbook.");
 
-    private static int ReadColumn(string address)
+    internal static int ReadColumn(string address)
     {
         var result = 0;
         foreach (var character in address.TakeWhile(char.IsAsciiLetter))
