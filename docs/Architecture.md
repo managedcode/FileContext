@@ -89,14 +89,14 @@ All potentially large operations are controlled by `FileContextOptions`: full-re
 
 ## Generated documents
 
-`FileContextDocumentService` shares `ManagedCodeStorageFileStore` with standard navigation and bounded reads. It creates new UTF-8 text/CSV, XLSX workbooks and paginated PDF documents under unique relative paths. `FileContextDocumentTools` supplies the same native functions to FileContextProvider or a host-owned tool registry.
+`FileContextDocumentService` shares `ManagedCodeStorageFileStore` with standard navigation and bounded reads. It creates new UTF-8 text/CSV, XLSX workbooks, paginated PDF documents, and branded report PDF/HTML/chart PNG output under unique relative paths. Report rendering uses an embedded Noto Sans font and Skia, receives host-resolved image bytes, and never makes network requests. See [branded reports](Features/ReportRendering.md). `FileContextDocumentTools` supplies the same native functions to FileContextProvider or a host-owned tool registry.
 
 ```mermaid
 flowchart LR
   Provider[FileContextProvider] --> Tools[FileContextDocumentTools]
   Host[Host native and JavaScript tools] --> Tools
   Tools --> Documents[FileContextDocumentService]
-  Documents --> Writers[CSV OpenXml PdfPig]
+  Documents --> Writers[CSV OpenXml PdfPig Skia report renderer]
   Documents --> Store[ManagedCodeStorageFileStore]
   Store --> Storage[IStorage]
 ```

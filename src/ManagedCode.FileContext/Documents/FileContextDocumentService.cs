@@ -46,4 +46,19 @@ public sealed partial class FileContextDocumentService(ManagedCodeStorageFileSto
         }
         return path;
     }
+    /// <summary>Renders all outputs before storing any file in the scoped FileContext.</summary>
+    public async Task<FileContextReportResult> CreateReportAsync(FileContextReport report,
+        CancellationToken cancellationToken = default)
+    {
+        var outputs = FileContextReportRenderer.Render(report, cancellationToken);
+        var files = new List<FileContextCreatedFile>(outputs.Count);
+        foreach (var output in outputs)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            files.Add(await CreateAsync(output.FileName, output.ContentType,
+                _ => output.Bytes, cancellationToken).ConfigureAwait(false));
+        }
+        return new FileContextReportResult(files);
+    }
+
 }
