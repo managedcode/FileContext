@@ -57,20 +57,21 @@ internal static class ReportPdfKpiPainter
         using var paint = ReportCanvas.Paint(color, 9);
         if (indicator is "up" or "down")
         {
-            using var triangle = new SKPath();
+            using var builder = new SKPathBuilder();
             if (indicator is "up")
             {
-                triangle.MoveTo(x, y + 8);
-                triangle.LineTo(x + 5, y);
-                triangle.LineTo(x + 10, y + 8);
+                builder.MoveTo(x, y + 8);
+                builder.LineTo(x + 5, y);
+                builder.LineTo(x + 10, y + 8);
             }
             else
             {
-                triangle.MoveTo(x, y);
-                triangle.LineTo(x + 5, y + 8);
-                triangle.LineTo(x + 10, y);
+                builder.MoveTo(x, y);
+                builder.LineTo(x + 5, y + 8);
+                builder.LineTo(x + 10, y);
             }
-            triangle.Close();
+            builder.Close();
+            using var triangle = builder.Detach();
             canvas.DrawPath(triangle, paint);
             x += 16;
         }

@@ -89,9 +89,16 @@ public sealed class ReportCreationTests
             title = "Channels", chartType, labels = new[] { "Search", "Email" },
             series = new[] { new { name = "Visits", values = new[] { 2, 4 } } },
             xAxis = "Channel", yAxis = "Visits"
-        })], ["png"]);
+        })], ["pdf", "png"]);
         var output = await new FileContextService(store, options).Documents.CreateReportAsync(report);
-        output.Files.Single().MediaType.ShouldBe("image/png");
+        var png = output.Files.Single(file => string.Equals(file.MediaType, "image/png", StringComparison.Ordinal));
+        await using var pngStream = await store.OpenReadAsync(png.Path);
+        var signature = new byte[8];
+        (await pngStream.ReadAsync(signature)).ShouldBe(8);
+        signature.ShouldBe(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 });
+        await using var pdfStream = await store.OpenReadAsync(output.Files.Single(file => string.Equals(file.MediaType, "application/pdf", StringComparison.Ordinal)).Path);
+        using var pdf = PdfDocument.Open(pdfStream);
+        pdf.GetPage(1).Text.ShouldContain("Channels");
     }
 
     [Fact]

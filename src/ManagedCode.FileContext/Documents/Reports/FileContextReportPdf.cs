@@ -70,7 +70,7 @@ internal sealed class FileContextReportPdf : IDisposable
         {
             using var logo = SKBitmap.Decode(Convert.FromBase64String(theme.LogoBase64))
                 ?? throw new ArgumentException("Theme logo must be PNG or JPEG.");
-            canvas.DrawBitmap(logo, new SKRect(Margin, 26, Margin + 31, 57));
+            canvas.DrawBitmap(logo, new SKRect(Margin, 26, Margin + 31, 57), new SKSamplingOptions(SKFilterMode.Linear));
         }
         else
         {
@@ -170,7 +170,7 @@ internal sealed class FileContextReportPdf : IDisposable
         using var caption = ReportCanvas.Paint(ReportCanvas.Parse(theme.Muted), 9);
         var lines = ReportCanvas.Wrap(ReportJson.Text(content, "caption"), caption, pageWidth - Margin * 2);
         Ensure(height + lines.Count * 14 + 12);
-        canvas.DrawBitmap(image, new SKRect(Margin, Y, pageWidth - Margin, Y + height));
+        canvas.DrawBitmap(image, new SKRect(Margin, Y, pageWidth - Margin, Y + height), new SKSamplingOptions(SKFilterMode.Linear));
         Y += height + 5;
         foreach (var line in lines)
         {

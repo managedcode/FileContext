@@ -114,7 +114,7 @@ internal static class FileContextReportChart
     }
 
     private static void DrawAxisLabels(SKCanvas canvas, SKRect bounds, SKRect plot,
-        JsonElement content, SKPaint axis)
+        JsonElement content, ReportPaint axis)
     {
         var xAxis = ReportJson.Text(content, "xAxis");
         var yAxis = ReportJson.Text(content, "yAxis");
