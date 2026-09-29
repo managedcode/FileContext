@@ -1,13 +1,19 @@
-using ManagedCode.FileContext.Pdf;
-
 namespace ManagedCode.FileContext;
 
 /// <summary>Default limits and selectors used by <see cref="FileContextOptions" />.</summary>
 public static class FileContextDefaults
 {
+    public const int MaximumPdfPngQuality = 100;
     public const long MaximumGeneratedFileBytes = 64L * 1024L * 1024L;
     public const int FirstLineNumber = 1;
-    public const int MaximumPdfReadBytes = FileContextPdfImages.MaximumPdfBytes;
+    public const int MaximumPdfReadBytes = 100 * 1024 * 1024;
+    public const int MaximumImageBytes = 8 * 1024 * 1024;
+    public const int MaximumRenderedPagePixels = 4_000_000;
+    public const int MaximumImagesPerPdfPage = 20;
+    public const double DefaultPdfPageScale = 1.5;
+    public const double MinimumPdfPageScale = 0.5;
+    public const double MaximumPdfPageScale = 3;
+    public const int PdfPngQuality = 100;
     public const int MaximumPdfTextCharacters = 50_000;
     public const int MaximumDocxReadBytes = 25 * 1024 * 1024;
     public const int MaximumDocxTextCharacters = 20_000;

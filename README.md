@@ -187,7 +187,7 @@ Results include `StartLine`, `EndLine`, `HasMore`, and `TotalLines` when the end
 
 `IFileContextPdf.ReadPdfTextAsync(path)` returns bounded text, `PageCount`, and one-based `PagesWithoutText`. It does not perform OCR. A scanned page can instead be rendered with `RenderPdfPageAsync(path, pageNumber)`, which returns PNG `DataContent`. Use `CountPdfPageImagesAsync` and `ExtractPdfImageAsync` when the original embedded pictures are needed rather than the complete page. The four read-only `file_context_pdf_*` tools expose the same operations from scoped storage.
 
-For an authenticated PDF already held as bytes, `FileContextPdfTextExtractor.Extract`, `FileContextPdfImages.RenderPagePng`, and `FileContextPdfImages.ExtractPageImagesPng` work without storing it. PDF source reads are capped at 100 MiB by default; page rasterization caps pixels and PNG size. A host must pass image `DataContent` to its model as image content. A generic OpenAI Chat function result serializes it as text, so hosts must explicitly bridge image tool results into a multimodal model message.
+For an authenticated PDF already held as bytes, `FileContextPdfTextExtractor.Extract`, `FileContextPdfImages.RenderPagePng`, and `FileContextPdfImages.ExtractPageImagesPng` work without storing it. PDF source reads default to 100 MiB and accept `FileContextOptions` for a different limit; page rasterization also uses configured pixel and PNG limits. `FileContextImageContent` creates model-visible `DataContent` from PNG bytes or base64 and `UriContent` from an HTTPS URL. A URL reference is not fetched by FileContext, so the model provider must be able to access it. A host must pass image content to its model as image content. A generic OpenAI Chat function result serializes it as text, so hosts must explicitly bridge image tool results into a multimodal model message.
 
 `file_context_docx_text(path, startParagraph?, startCharacter?, paragraphCount?)` reads ordinary paragraph and table text from a scoped DOCX package. The result contains numbered paragraph segments and `nextParagraph`/`nextCharacter`; use that cursor to continue a long document. Reads are limited to 50 paragraphs and 20,000 characters per call, with a configurable 25 MiB source limit (`MaximumDocxReadBytes`). It does not OCR embedded images. DOCX and XLSX packages are excluded from generic text reads and grep.
 
@@ -245,6 +245,11 @@ Paths are logical, relative, and `/`-separated. `RootPrefix` scopes storage acce
 
 | Option | Default |
 | --- | ---: |
+| `MaximumPdfReadBytes` | 100 MiB |
+| `MaximumImageBytes` | 8 MiB |
+| `MaximumRenderedPagePixels` / `MaximumImagesPerPdfPage` | 4,000,000 / 20 |
+| `DefaultPdfPageScale` / `MinimumPdfPageScale` / `MaximumPdfPageScale` | 1.5 / 0.5 / 3 |
+| `PdfPngQuality` | 100 |
 | `MaximumFullReadBytes` | 1 MiB |
 | `MaximumRangeReadBytes` | 256 KiB |
 | `DefaultRangeLineCount` / `MaximumRangeLineCount` | 200 / 1,000 |
@@ -263,7 +268,7 @@ These settings are available through `FileContextOptions`; their named defaults 
 
 ### Configure limits and timeouts
 
-Every option in the table is configurable through `FileContextOptions`, for both default and keyed registrations. Configure the options before building your service provider:
+Every option in the table is configurable through `IOptions<FileContextOptions>`, for both default and keyed registrations. Configure the options before building your service provider:
 
 ```csharp
 services.AddManagedCodeFileContext(storage, options =>
@@ -291,17 +296,27 @@ services.AddManagedCodeFileContext(storage, options =>
 In a host that uses Microsoft configuration binding, the same options can come from `appsettings.json`, environment variables, or another configuration source:
 
 ```csharp
-using Microsoft.Extensions.Configuration;
-
-services.AddManagedCodeFileContext(storage, options =>
-    configuration.GetSection("FileContext").Bind(options));
+services.AddFileContextOptions(configuration);
+services.AddManagedCodeFileContext(storage);
 ```
 
-The host supplies `configuration` and the `Microsoft.Extensions.Configuration.Binder` package. For example:
+The package binds the `FileContext` section through the standard options pipeline. For example:
+
+```csharp
+var options = provider.GetRequiredService<IOptions<FileContextOptions>>().Value;
+var page = FileContextPdfImages.RenderPagePng(pdfBytes, pageNumber, options);
+var raw = FileContextImageContent.FromPngBytes(page, options);
+var base64 = FileContextImageContent.ToBase64Png(page, options);
+var fromBase64 = FileContextImageContent.FromBase64Png(base64, options);
+var remote = FileContextImageContent.FromPngUrl(new Uri("https://example.com/page.png"));
+```
+
+The URL form is a reference only; FileContext does not download it. Use a URL only when the model provider can fetch that resource.
 
 ```json
 {
   "FileContext": {
+    "MaximumPdfReadBytes": 104857600,
     "MaximumFullReadBytes": 4194304,
     "MaximumRangeReadBytes": 524288,
     "DefaultRangeLineCount": 100,
@@ -325,7 +340,7 @@ The host supplies `configuration` and the `Microsoft.Extensions.Configuration.Bi
 
 Configured deadline expiry surfaces as `TimeoutException`, which the function-invocation loop can return as a tool error. Caller cancellation remains `OperationCanceledException`. Cancellation is cooperative: a provider that ignores the token or a synchronous regex/graph operation can finish later than the deadline; FileContext awaits the work and checks cancellation before returning a successful result. Regex matching retains its own `RegexTimeout`.
 
-Options are bound at registration time; changing the configuration later does not automatically reconfigure an existing provider. To set a per-call deadline or allow the caller to cancel earlier, pass a cancellation token:
+`IOptions<FileContextOptions>` resolves the configured values when the provider is created. Existing providers keep their resolved options. To set a per-call deadline or allow the caller to cancel earlier, pass a cancellation token:
 
 ```csharp
 using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));

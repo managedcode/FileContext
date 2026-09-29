@@ -105,6 +105,31 @@ public sealed class FileContextPdfTests
     }
 
     [Fact]
+    public void Direct_page_rendering_obeys_the_configured_pdf_limit()
+    {
+        var pdf = FileContextPdfTestPdfs.ScannedPages(1);
+        var options = new FileContextOptions { MaximumPdfReadBytes = pdf.Length - 1 };
+
+        Should.Throw<IOException>(() => FileContextPdfImages.RenderPagePng(pdf, 1, options));
+        options.MaximumPdfReadBytes = pdf.Length;
+        FileContextPdfImages.RenderPagePng(pdf, 1, options).Take(PngSignature.Length)
+            .ShouldBe(PngSignature);
+    }
+
+    [Fact]
+    public void Page_and_image_budgets_come_from_file_context_options()
+    {
+        var pdf = FileContextPdfTestPdfs.ScannedPages(1);
+        var options = new FileContextOptions { MaximumRenderedPagePixels = 1 };
+        Should.Throw<IOException>(() => FileContextPdfImages.RenderPagePng(pdf, 1, options));
+
+        options.MaximumRenderedPagePixels = FileContextDefaults.MaximumRenderedPagePixels;
+        options.MaximumImageBytes = 1;
+        Should.Throw<IOException>(() => FileContextPdfImages.RenderPagePng(pdf, 1, options));
+        Should.Throw<IOException>(() => FileContextPdfImages.ExtractPageImagesPng(pdf, 1, options));
+    }
+
+    [Fact]
     public async Task Pdf_service_enforces_byte_and_image_index_limits()
     {
         await using var scope = await TestStorageScope.CreateAsync();

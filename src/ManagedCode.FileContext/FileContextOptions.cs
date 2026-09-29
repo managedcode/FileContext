@@ -3,6 +3,8 @@ namespace ManagedCode.FileContext;
 /// <summary>Controls file access, approval, search, and graph limits for one context provider.</summary>
 public sealed class FileContextOptions
 {
+    public const string SectionName = "FileContext";
+
     private static readonly TimeSpan MaximumOperationTimeout = TimeSpan.FromMilliseconds(uint.MaxValue - 1L);
     private static readonly TimeSpan MaximumRegexTimeout = TimeSpan.FromMilliseconds(int.MaxValue - 1);
 
@@ -20,6 +22,23 @@ public sealed class FileContextOptions
     public bool RequireWriteToolApproval { get; set; } = true;
 
     public int MaximumPdfReadBytes { get; set; } = FileContextDefaults.MaximumPdfReadBytes;
+
+    public int MaximumImageBytes { get; set; } = FileContextDefaults.MaximumImageBytes;
+
+    public int MaximumRenderedPagePixels { get; set; } = FileContextDefaults.MaximumRenderedPagePixels;
+
+    public int MaximumImagesPerPdfPage { get; set; } = FileContextDefaults.MaximumImagesPerPdfPage;
+
+    public double DefaultPdfPageScale { get; set; } = FileContextDefaults.DefaultPdfPageScale;
+
+    public double MinimumPdfPageScale { get; set; } = FileContextDefaults.MinimumPdfPageScale;
+
+    public double MaximumPdfPageScale { get; set; } = FileContextDefaults.MaximumPdfPageScale;
+
+    public int PdfPngQuality { get; set; } = FileContextDefaults.PdfPngQuality;
+
+    /// <summary>Creates an independent copy for a scoped provider while retaining configured limits.</summary>
+    public FileContextOptions Clone() => (FileContextOptions)MemberwiseClone();
 
     public int MaximumDocxReadBytes { get; set; } = FileContextDefaults.MaximumDocxReadBytes;
 
@@ -56,6 +75,19 @@ public sealed class FileContextOptions
     {
         ValidatePositive(MaximumGeneratedFileBytes, nameof(MaximumGeneratedFileBytes));
         ValidatePositive(MaximumPdfReadBytes, nameof(MaximumPdfReadBytes));
+        ValidatePositive(MaximumImageBytes, nameof(MaximumImageBytes));
+        ValidatePositive(MaximumRenderedPagePixels, nameof(MaximumRenderedPagePixels));
+        ValidatePositive(MaximumImagesPerPdfPage, nameof(MaximumImagesPerPdfPage));
+        if (!double.IsFinite(MinimumPdfPageScale) || MinimumPdfPageScale <= 0
+            || !double.IsFinite(DefaultPdfPageScale) || DefaultPdfPageScale < MinimumPdfPageScale
+            || !double.IsFinite(MaximumPdfPageScale) || MaximumPdfPageScale < DefaultPdfPageScale)
+        {
+            throw new InvalidOperationException("PDF page scales must be finite, positive, and ordered.");
+        }
+        if (PdfPngQuality is < 0 or > FileContextDefaults.MaximumPdfPngQuality)
+        {
+            throw new InvalidOperationException("PDF PNG quality must be between 0 and 100.");
+        }
         ValidatePositive(MaximumDocxReadBytes, nameof(MaximumDocxReadBytes));
         ValidatePositive(MaximumFullReadBytes, nameof(MaximumFullReadBytes));
         ValidatePositive(MaximumRangeReadBytes, nameof(MaximumRangeReadBytes));

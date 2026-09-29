@@ -1,7 +1,9 @@
 using ManagedCode.Storage.Core;
 using Microsoft.Agents.AI;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace ManagedCode.FileContext;
 
@@ -13,9 +15,14 @@ public static class FileContextServiceCollectionExtensions
         Action<FileContextOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(services);
-        var options = CreateOptions(configure);
+        var builder = services.AddOptions<FileContextOptions>();
+        if (configure is not null)
+        {
+            builder.Configure(configure);
+        }
+        AddOptionsValidator(services);
 
-        services.TryAddSingleton(options);
+        services.TryAddSingleton(static provider => provider.GetRequiredService<IOptions<FileContextOptions>>().Value);
         services.TryAddSingleton<ManagedCodeStorageFileStore>();
         services.TryAddSingleton<AgentFileStore>(static provider => provider.GetRequiredService<ManagedCodeStorageFileStore>());
         services.TryAddSingleton<IFileContext, FileContextService>();
@@ -43,20 +50,29 @@ public static class FileContextServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(serviceKey);
-        var options = CreateOptions(configure);
+        var optionsName = $"{FileContextOptions.SectionName}:{Guid.NewGuid():N}";
+        var builder = services.AddOptions<FileContextOptions>(optionsName);
+        if (configure is not null)
+        {
+            builder.Configure(configure);
+        }
+        AddOptionsValidator(services);
 
-        services.AddKeyedSingleton(serviceKey, options);
+        services.AddKeyedSingleton<FileContextOptions>(serviceKey, (provider, _) =>
+            provider.GetRequiredService<IOptionsMonitor<FileContextOptions>>().Get(optionsName));
         services.AddKeyedSingleton<ManagedCodeStorageFileStore>(serviceKey, (provider, key) =>
-            new ManagedCodeStorageFileStore(provider.GetRequiredKeyedService<IStorage>(key), options));
+            new ManagedCodeStorageFileStore(provider.GetRequiredKeyedService<IStorage>(key),
+                provider.GetRequiredKeyedService<FileContextOptions>(key)));
         services.AddKeyedSingleton<IFileContext>(serviceKey, (provider, key) =>
-            new FileContextService(provider.GetRequiredKeyedService<ManagedCodeStorageFileStore>(key), options));
+            new FileContextService(provider.GetRequiredKeyedService<ManagedCodeStorageFileStore>(key),
+                provider.GetRequiredKeyedService<FileContextOptions>(key)));
         services.AddKeyedSingleton<IFileContextPdf>(serviceKey, (provider, key) =>
             (IFileContextPdf)provider.GetRequiredKeyedService<IFileContext>(key));
         services.AddKeyedSingleton<FileContextProvider>(serviceKey, (provider, key) =>
             new FileContextProvider(
                 provider.GetRequiredKeyedService<ManagedCodeStorageFileStore>(key),
                 provider.GetRequiredKeyedService<IFileContext>(key),
-                options));
+                provider.GetRequiredKeyedService<FileContextOptions>(key)));
         services.AddKeyedSingleton<AIContextProvider>(serviceKey, (provider, key) =>
             provider.GetRequiredKeyedService<FileContextProvider>(key));
         services.AddKeyedSingleton<AgentFileStore>(serviceKey, (provider, key) =>
@@ -64,11 +80,17 @@ public static class FileContextServiceCollectionExtensions
         return services;
     }
 
-    private static FileContextOptions CreateOptions(Action<FileContextOptions>? configure)
+    /// <summary>Binds the FileContext section for hosts that compose scoped providers themselves.</summary>
+    public static IServiceCollection AddFileContextOptions(this IServiceCollection services, IConfiguration configuration)
     {
-        var options = new FileContextOptions();
-        configure?.Invoke(options);
-        options.Validate();
-        return options;
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+        services.AddOptions<FileContextOptions>()
+            .Bind(configuration.GetSection(FileContextOptions.SectionName));
+        AddOptionsValidator(services);
+        return services;
     }
+
+    private static void AddOptionsValidator(IServiceCollection services) =>
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<FileContextOptions>, FileContextOptionsValidator>());
 }

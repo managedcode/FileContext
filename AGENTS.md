@@ -39,6 +39,8 @@ Tests use xUnit over VSTest. NuGet versions are centrally managed in `Directory.
 
 ## Boundaries
 
+- Expose FileContext behavior and limits through typed options registered with the standard `IOptions<T>` pattern; hosts bind configuration and consumers use those resolved options rather than introducing fixed capacity constants.
+- Expose image content as binary bytes, base64, and URL references through typed package APIs so hosts can select the correct model-visible representation.
 - `ManagedCode.Storage.Core.IStorage` is the only storage contract the product package may require.
 - Do not depend on a concrete storage provider in product code.
 - Keep Microsoft Agent Framework adaptation separate from Markdown graph materialization.

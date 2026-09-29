@@ -6,7 +6,6 @@ namespace ManagedCode.FileContext;
 public sealed partial class FileContextService
 {
     private const string PdfExtension = ".pdf";
-    private const string PngMediaType = "image/png";
     private const int CopyBufferSize = 81920;
 
     public Task<FileContextPdfText> ReadPdfTextAsync(string path,
@@ -24,14 +23,14 @@ public sealed partial class FileContextService
     public Task<DataContent> RenderPdfPageAsync(string path, int pageNumber,
         CancellationToken cancellationToken = default) =>
         FileContextOperation.RunAsync(_options.OperationTimeout, async token =>
-            new DataContent(FileContextPdfImages.RenderPagePng(
-                await ReadPdfBytesAsync(path, token).ConfigureAwait(false), pageNumber), PngMediaType), cancellationToken);
+            FileContextImageContent.FromPngBytes(FileContextPdfImages.RenderPagePng(
+                await ReadPdfBytesAsync(path, token).ConfigureAwait(false), pageNumber, _options), _options), cancellationToken);
 
     public Task<int> CountPdfPageImagesAsync(string path, int pageNumber,
         CancellationToken cancellationToken = default) =>
         FileContextOperation.RunAsync(_options.OperationTimeout, async token =>
             FileContextPdfImages.ExtractPageImagesPng(
-                await ReadPdfBytesAsync(path, token).ConfigureAwait(false), pageNumber).Count, cancellationToken);
+                await ReadPdfBytesAsync(path, token).ConfigureAwait(false), pageNumber, _options).Count, cancellationToken);
 
     public Task<DataContent> ExtractPdfImageAsync(string path, int pageNumber, int imageNumber,
         CancellationToken cancellationToken = default)
@@ -40,12 +39,12 @@ public sealed partial class FileContextService
         return FileContextOperation.RunAsync(_options.OperationTimeout, async token =>
         {
             var images = FileContextPdfImages.ExtractPageImagesPng(
-                await ReadPdfBytesAsync(path, token).ConfigureAwait(false), pageNumber);
+                await ReadPdfBytesAsync(path, token).ConfigureAwait(false), pageNumber, _options);
             if (imageNumber > images.Count)
             {
                 throw new InvalidOperationException("The embedded image number is outside this PDF page.");
             }
-            return new DataContent(images[imageNumber - 1].PngBytes, PngMediaType);
+            return FileContextImageContent.FromPngBytes(images[imageNumber - 1].PngBytes, _options);
         }, cancellationToken);
     }
 

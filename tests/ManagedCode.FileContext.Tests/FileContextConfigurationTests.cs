@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using ManagedCode.Storage.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace ManagedCode.FileContext.Tests;
 
@@ -14,6 +15,8 @@ public sealed class FileContextConfigurationTests
             "RootPrefix": "configured",
             "OperationTimeout": "00:00:10",
             "MaximumFullReadBytes": 8,
+            "MaximumPdfReadBytes": 31457280,
+            "MaximumImageBytes": 1024,
             "MaximumRangeReadBytes": 8,
             "DefaultRangeLineCount": 1,
             "MaximumRangeLineCount": 2,
@@ -41,12 +44,18 @@ public sealed class FileContextConfigurationTests
         var configuration = new ConfigurationBuilder().AddJsonStream(json).Build();
         using var configurationLifetime = (IDisposable)configuration;
         var services = new ServiceCollection();
-        Register(services, scope.Storage, configuration.GetSection("FileContext"), keyed);
+        Register(services, scope.Storage, configuration, keyed);
         await using var provider = services.BuildServiceProvider();
         var store = Resolve<ManagedCodeStorageFileStore>(provider, keyed);
         var context = Resolve<IFileContext>(provider, keyed);
         var options = Resolve<FileContextOptions>(provider, keyed);
 
+        if (!keyed)
+        {
+            provider.GetRequiredService<IOptions<FileContextOptions>>().Value.ShouldBeSameAs(options);
+        }
+        options.MaximumPdfReadBytes.ShouldBe(30 * 1024 * 1024);
+        options.MaximumImageBytes.ShouldBe(1024);
         options.OperationTimeout.ShouldBe(TimeSpan.FromSeconds(10));
         options.RegexTimeout.ShouldBe(TimeSpan.FromMilliseconds(25));
         await AssertFileLimitsAsync(store, context);
@@ -69,16 +78,30 @@ public sealed class FileContextConfigurationTests
         exception.MatchTimeout.ShouldBe(timeout);
     }
 
-    private static void Register(IServiceCollection services, IStorage storage, IConfiguration section, bool keyed)
+    [Fact]
+    public void Invalid_bound_pdf_limit_fails_when_options_are_resolved()
+    {
+        using var json = new MemoryStream(Encoding.UTF8.GetBytes("""
+            { "FileContext": { "MaximumPdfReadBytes": 0 } }
+            """));
+        var configuration = new ConfigurationBuilder().AddJsonStream(json).Build();
+        using var services = new ServiceCollection().AddFileContextOptions(configuration).BuildServiceProvider();
+
+        Should.Throw<OptionsValidationException>(() =>
+            services.GetRequiredService<IOptions<FileContextOptions>>().Value);
+    }
+
+    private static void Register(IServiceCollection services, IStorage storage, IConfiguration configuration, bool keyed)
     {
         if (keyed)
         {
             services.AddKeyedSingleton("workspace", storage);
-            services.AddKeyedManagedCodeFileContext("workspace", options => section.Bind(options));
+            services.AddKeyedManagedCodeFileContext("workspace", options => configuration.GetSection(FileContextOptions.SectionName).Bind(options));
         }
         else
         {
-            services.AddManagedCodeFileContext(storage, options => section.Bind(options));
+            services.AddFileContextOptions(configuration);
+            services.AddManagedCodeFileContext(storage);
         }
     }
 

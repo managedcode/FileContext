@@ -2,6 +2,12 @@
 
 All notable changes to ManagedCode.FileContext are documented here.
 
+## 1.0.11
+
+- Bind and validate FileContext limits through `IOptions<FileContextOptions>`, including keyed registrations and host configuration.
+- Apply configured PDF source, page, and image limits to direct rendering and storage-backed tools.
+- Add typed model image content helpers for PNG bytes, base64, and HTTPS URL references.
+
 ## 1.0.10
 
 - Raise the bounded PDF source read limit from 25 MiB to 100 MiB for scanned documents while retaining per-page pixel and PNG output limits.

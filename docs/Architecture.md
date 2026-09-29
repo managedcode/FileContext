@@ -77,7 +77,7 @@ flowchart TD
 
 ## Operational limits
 
-All potentially large operations are controlled by `FileContextOptions`: full-read bytes, range bytes, files scanned, bytes per searched file, matches per file, total search results, graph documents, graph source bytes, and exported graph characters. Non-seekable cloud streams are supported by sequential streaming.
+All potentially large operations are controlled by `IOptions<FileContextOptions>`: PDF source/page/image budgets, full-read bytes, range bytes, files scanned, bytes per searched file, matches per file, total search results, graph documents, graph source bytes, and exported graph characters. Non-seekable cloud streams are supported by sequential streaming.
 
 ## Start here
 

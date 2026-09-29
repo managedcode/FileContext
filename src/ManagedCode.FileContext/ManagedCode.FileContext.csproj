@@ -20,6 +20,8 @@
     <PackageReference Include="Microsoft.Agents.AI" />
     <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" />
   </ItemGroup>
   <ItemGroup>
