@@ -7,6 +7,9 @@ public static class FileContextDefaults
     public const int FirstLineNumber = 1;
     public const int MaximumPdfReadBytes = 25 * 1024 * 1024;
     public const int MaximumPdfTextCharacters = 50_000;
+    public const int MaximumDocxReadBytes = 25 * 1024 * 1024;
+    public const int MaximumDocxTextCharacters = 20_000;
+    public const int MaximumDocxParagraphsPerRead = 50;
     public const long MaximumFullReadBytes = 1_024 * 1_024;
     public const long MaximumRangeReadBytes = 256 * 1_024;
     public const int DefaultRangeLineCount = 200;

@@ -1,6 +1,7 @@
 using System.ClientModel;
 using ManagedCode.LlmTck.Configuration;
 using ManagedCode.LlmTck.Models;
+using ManagedCode.Storage.Core.Models;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using OpenAI;
@@ -10,6 +11,43 @@ namespace ManagedCode.FileContext.Tests.LlmTck;
 public sealed class FileContextAgentLlmTckTests
 {
     internal const string Model = "gpt-4.1-mini";
+
+    [Fact]
+    public async Task Agent_reads_docx_through_native_tool_and_receives_bounded_text()
+    {
+        const string prompt = "Read family.docx.";
+        LlmTckToolReplay.Reset();
+        await using var host = new LlmTckTestHost(() => new LlmTckConfigurationBuilder()
+            .AddModel(Model, LlmTckModelKind.Chat)
+            .AddChatScenario("docx-tool-loop", scenario => scenario
+                .ForModel(Model)
+                .WhenUserContains(prompt)
+                .Responds(LlmTckToolReplay.CreateResponse("docx-1", FileContextToolNames.DocxText,
+                    "{\"path\":\"family.docx\",\"paragraphCount\":1}"))
+                .Responds("Document read"))
+            .Build());
+        await host.StartAsync();
+        await using var storage = await TestStorageScope.CreateAsync();
+        var upload = await storage.Storage.UploadAsync(FileContextDocxTestFiles.WithParagraphs(
+            "Grandmother's family history", "Next paragraph"),
+            new UploadOptions { FileName = "family.docx" });
+        upload.IsSuccess.ShouldBeTrue(upload.Problem?.Detail);
+        var store = new ManagedCodeStorageFileStore(storage.Storage);
+        using var provider = new FileContextProvider(store, new FileContextService(store),
+            new FileContextOptions { RequireReadToolApproval = false });
+        var sdk = new OpenAIClient(new ApiKeyCredential("not-required-by-llm-tck"),
+            new OpenAIClientOptions { Endpoint = LlmTckToolReplay.CreateRouteUri(host.Endpoint) });
+        using var client = sdk.GetChatClient(Model).AsIChatClient().AsBuilder()
+            .UseAIContextProviders(provider).UseFunctionInvocation().Build();
+        var agent = new ChatClientAgent(client, new ChatClientAgentOptions { UseProvidedChatClientAsIs = true });
+
+        (await agent.RunAsync(prompt)).Text.ShouldBe("Document read");
+        LlmTckToolReplay.RecordedRequests.Count.ShouldBe(2);
+        LlmTckToolReplay.RecordedRequests[0].ShouldContain(FileContextToolNames.DocxText);
+        LlmTckToolReplay.RecordedRequests[1].ShouldContain("Grandmother's family history");
+        LlmTckToolReplay.RecordedRequests[1].ShouldContain("nextParagraph");
+        (await host.GetAssertionsAsync()).Matched.ShouldBe(2);
+    }
 
     [Fact]
     public async Task Agent_WhenLlmRequestsStandardReadTool_ExecutesToolAndReturnsGroundedAnswer()

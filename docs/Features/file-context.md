@@ -4,7 +4,7 @@
 
 ManagedCode.FileContext lets an Agent Framework agent work with files from any ManagedCode.Storage provider and query Markdown files as a knowledge graph.
 
-In scope: standard file access, bounded line navigation, metadata, Markdown graph retrieval/export, DI, path isolation, and deterministic tool-loop testing. Out of scope: provider credentials, direct model hosting, binary document parsing, and an alternative file protocol.
+In scope: standard file access, bounded line navigation, metadata, native PDF/DOCX/XLSX reads, Markdown graph retrieval/export, DI, path isolation, and deterministic tool-loop testing. Out of scope: provider credentials, direct model hosting, and an alternative file protocol.
 
 ## Rules
 
@@ -23,7 +23,7 @@ In scope: standard file access, bounded line navigation, metadata, Markdown grap
 13. The context provider injects capability instructions and tools, not arbitrary file content as system instructions.
 14. DI supports both the default `IStorage` and a named/keyed `IStorage` registration.
 15. Optional `OperationTimeout` applies to each public storage/context operation, combining with caller cancellation and preserving one deadline across internal steps. It defaults to null; regex matching has its separate `RegexTimeout`.
-16. The NuGet package has version `1.0.8`; publication occurs only from the GitHub Actions release workflow.
+16. The NuGet package has version `1.0.9`; publication occurs only from the GitHub Actions release workflow.
 
 ## Main flow
 
@@ -87,7 +87,7 @@ Independent writes and range reads on eight different files are tested concurren
 9. A real Agent Framework loop receives an LlmTck tool call, executes storage-backed `file_access_read`, proves the file content reaches the second model request, and returns the expected final answer.
 10. LlmTck tool loops exercise every read-only, mutation, and extended tool against the real filesystem provider.
 11. A sparse 1 GiB file supports bounded repeated range reads without proportional allocation; a giant unterminated line fails at the configured byte boundary.
-12. The packed `1.0.8` package installs and runs in a clean smoke project.
+12. The packed `1.0.9` package installs and runs in a clean smoke project.
 
 ## Definition of done
 
@@ -114,5 +114,11 @@ sequenceDiagram
 Verification: DocumentCreationTests and DocumentValidationTests reopen real formats and test boundary failures; FileDocumentCreationLlmTckTests exercises CSV/XLSX/PDF through real model tool calls and checks closed call/result history.
 
 ## PDF reads and vision images
+
+DOCX reading uses the native `file_context_docx_text` tool. It reads ordinary paragraph and table
+text from the scoped `.docx` package in bounded windows. Each result includes the next paragraph
+and character offset when more text remains, so an agent can continue without loading a long
+document into one model call. The tool does not execute macros, fetch external links, or perform
+OCR on embedded images. Generic text reads refuse DOCX, and text search skips it.
 
 `file_context_pdf_text` reports a bounded text-layer prefix, total page count, and one-based pages with almost no text. It performs no OCR. `file_context_pdf_page_image` renders a complete page as PNG. `file_context_pdf_images_info` counts embedded image objects, and `file_context_pdf_image` returns one object as PNG. The direct `IFileContextPdf` methods and public byte-oriented PDF APIs support the same operations. Storage-scoped PDF reads enforce a byte cap; page rendering enforces pixel and image-byte caps. Image tools return `DataContent`; host chat pipelines must forward it as image content rather than stringify a function result.

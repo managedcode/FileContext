@@ -2,6 +2,11 @@
 
 All notable changes to ManagedCode.FileContext are documented here.
 
+## 1.0.9
+
+- Add a native bounded DOCX text tool with paragraph and character cursors for long documents.
+- Read DOCX through scoped storage and the pinned Open XML SDK; exclude binary DOCX packages from generic text reads and search.
+
 ## 1.0.8
 
 - Add bounded PDF text/page metadata, full-page PNG rendering, and embedded-image extraction through scoped file tools and public byte APIs.

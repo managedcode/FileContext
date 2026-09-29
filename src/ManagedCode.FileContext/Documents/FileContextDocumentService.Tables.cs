@@ -7,6 +7,7 @@ public sealed partial class FileContextDocumentService
     {
         FileContextTableReader.Validate(path, headerRow);
         return ReadSourceAsync(path,
-            (buffer, token) => FileContextTableReader.Read(buffer, path, headerRow, delimiter, options, token), cancellationToken);
+            (buffer, token) => FileContextTableReader.Read(buffer, path, headerRow, delimiter, options, token),
+            options.MaximumFullReadBytes, cancellationToken);
     }
 }

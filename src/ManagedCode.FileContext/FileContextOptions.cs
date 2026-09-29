@@ -21,6 +21,8 @@ public sealed class FileContextOptions
 
     public int MaximumPdfReadBytes { get; set; } = FileContextDefaults.MaximumPdfReadBytes;
 
+    public int MaximumDocxReadBytes { get; set; } = FileContextDefaults.MaximumDocxReadBytes;
+
     public long MaximumFullReadBytes { get; set; } = FileContextDefaults.MaximumFullReadBytes;
 
     public long MaximumRangeReadBytes { get; set; } = FileContextDefaults.MaximumRangeReadBytes;
@@ -54,6 +56,7 @@ public sealed class FileContextOptions
     {
         ValidatePositive(MaximumGeneratedFileBytes, nameof(MaximumGeneratedFileBytes));
         ValidatePositive(MaximumPdfReadBytes, nameof(MaximumPdfReadBytes));
+        ValidatePositive(MaximumDocxReadBytes, nameof(MaximumDocxReadBytes));
         ValidatePositive(MaximumFullReadBytes, nameof(MaximumFullReadBytes));
         ValidatePositive(MaximumRangeReadBytes, nameof(MaximumRangeReadBytes));
         ValidatePositive(DefaultRangeLineCount, nameof(DefaultRangeLineCount));

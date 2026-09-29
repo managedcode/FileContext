@@ -25,6 +25,7 @@ Your host supplies an `IStorage` backend and a model client. FileContext supplie
 | Multiple files | Issue independent tool calls in one turn, with optional concurrent execution |
 | Workspace isolation | Resolve logical paths under a configured storage prefix |
 | Observable results | Receive structured `found` / `not_found` metadata results that survive session restoration |
+| Office document reads | Read bounded DOCX paragraph windows and XLSX cell ranges through native tools |
 
 Product code depends only on `ManagedCode.Storage.Core`, so concrete storage providers stay in your application. The integration suite exercises the real filesystem provider; other backends use the same `IStorage` contract.
 
@@ -45,7 +46,7 @@ flowchart LR
 Requires **.NET 10**. Add FileContext and the storage provider your application uses:
 
 ```bash
-dotnet add package ManagedCode.FileContext --version 1.0.8
+dotnet add package ManagedCode.FileContext --version 1.0.9
 dotnet add package ManagedCode.Storage.FileSystem --version 10.0.7
 ```
 
@@ -134,6 +135,7 @@ Standard `file_access_*` tools come from Agent Framework's `FileAccessProvider`.
 | `file_context_pdf_page_image` | Render one complete PDF page as PNG `DataContent` | Yes |
 | `file_context_pdf_images_info` | Count embedded images on one PDF page | Yes |
 | `file_context_pdf_image` | Extract one embedded PDF image as PNG `DataContent` | Yes |
+| `file_context_docx_text` | Read DOCX paragraph windows with a continuation cursor | Yes |
 | `file_context_info` | Return file presence and metadata without reading content | Yes |
 | `file_context_markdown_graph_search` | Build and ranked-search a Markdown knowledge graph | Yes |
 | `file_context_markdown_graph_export` | Export a graph as Mermaid, DOT, Turtle, or JSON-LD | Yes |
@@ -186,6 +188,8 @@ Results include `StartLine`, `EndLine`, `HasMore`, and `TotalLines` when the end
 `IFileContextPdf.ReadPdfTextAsync(path)` returns bounded text, `PageCount`, and one-based `PagesWithoutText`. It does not perform OCR. A scanned page can instead be rendered with `RenderPdfPageAsync(path, pageNumber)`, which returns PNG `DataContent`. Use `CountPdfPageImagesAsync` and `ExtractPdfImageAsync` when the original embedded pictures are needed rather than the complete page. The four read-only `file_context_pdf_*` tools expose the same operations from scoped storage.
 
 For an authenticated PDF already held as bytes, `FileContextPdfTextExtractor.Extract`, `FileContextPdfImages.RenderPagePng`, and `FileContextPdfImages.ExtractPageImagesPng` work without storing it. Storage reads enforce `MaximumPdfReadBytes` (25 MiB by default); page rasterization caps pixels and PNG size. A host must pass image `DataContent` to its model as image content. A generic OpenAI Chat function result serializes it as text, so hosts must explicitly bridge image tool results into a multimodal model message.
+
+`file_context_docx_text(path, startParagraph?, startCharacter?, paragraphCount?)` reads ordinary paragraph and table text from a scoped DOCX package. The result contains numbered paragraph segments and `nextParagraph`/`nextCharacter`; use that cursor to continue a long document. Reads are limited to 50 paragraphs and 20,000 characters per call, with a configurable 25 MiB source limit (`MaximumDocxReadBytes`). It does not OCR embedded images. DOCX and XLSX packages are excluded from generic text reads and grep.
 
 ## Explore Markdown as a graph
 
@@ -359,7 +363,7 @@ dotnet pack src/ManagedCode.FileContext/ManagedCode.FileContext.csproj --configu
 
 ## Releases and license
 
-Version `1.0.8` is defined centrally in `Directory.Build.props`. Every push to `main` runs the Release workflow: restore, format, build, test with coverage, and pack. For a new package version, it publishes the validated NuGet artifact and creates the matching tag and GitHub release automatically. Already released versions are skipped. To release an update, bump the version, commit, and push; no manual tag is required.
+Version `1.0.9` is defined centrally in `Directory.Build.props`. Every push to `main` runs the Release workflow: restore, format, build, test with coverage, and pack. For a new package version, it publishes the validated NuGet artifact and creates the matching tag and GitHub release automatically. Already released versions are skipped. To release an update, bump the version, commit, and push; no manual tag is required.
 
 [MIT licensed](https://github.com/managedcode/FileContext/blob/main/LICENSE) · Built by [ManagedCode](https://github.com/managedcode)
 

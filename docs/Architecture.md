@@ -106,6 +106,8 @@ flowchart LR
 `FileContextDocumentService` opens XLSX packages read-only from the scoped storage adapter.
 `FileContextWorkbookReader` maps worksheets and cell rectangles into package-owned result records.
 It preserves coordinates and stored types without evaluating formulas or accessing external links.
+The same service opens DOCX packages read-only and streams bounded paragraph text through
+`FileContextDocxReader`, returning a cursor for later paragraph windows.
 
 ```mermaid
 flowchart LR

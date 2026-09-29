@@ -2,13 +2,15 @@ namespace ManagedCode.FileContext;
 
 internal static class StorageTextPolicy
 {
-    public static bool IsWorkbook(string path) => path.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase);
+    public static bool IsBinaryDocument(string path) =>
+        path.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)
+        || path.EndsWith(".docx", StringComparison.OrdinalIgnoreCase);
 
     public static void RequireText(string path)
     {
-        if (IsWorkbook(path))
+        if (IsBinaryDocument(path))
         {
-            throw new InvalidOperationException($"XLSX is a binary workbook. Use {FileContextToolNames.WorkbookInfo} and {FileContextToolNames.WorkbookRange} to read its sheets and cells.");
+            throw new InvalidOperationException($"This Office file is a binary package. Use {FileContextToolNames.DocxText} for DOCX or {FileContextToolNames.WorkbookInfo} and {FileContextToolNames.WorkbookRange} for XLSX.");
         }
     }
 }

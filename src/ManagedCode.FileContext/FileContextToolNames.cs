@@ -14,6 +14,7 @@ public static class FileContextToolNames
     public const string PdfPageImage = "file_context_pdf_page_image";
     public const string PdfImage = "file_context_pdf_image";
     public const string PdfImagesInfo = "file_context_pdf_images_info";
+    public const string DocxText = "file_context_docx_text";
     public const string ReadRange = "file_context_read_range";
     public const string GetInfo = "file_context_info";
     public const string SearchMarkdownGraph = "file_context_markdown_graph_search";

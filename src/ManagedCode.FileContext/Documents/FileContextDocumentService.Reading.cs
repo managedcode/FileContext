@@ -23,15 +23,16 @@ public sealed partial class FileContextDocumentService
         {
             using var document = SpreadsheetDocument.Open(buffer, false);
             return read(document, token);
-        }, cancellationToken);
+        }, options.MaximumFullReadBytes, cancellationToken);
     }
 
-    private Task<T> ReadSourceAsync<T>(string path, Func<MemoryStream, CancellationToken, T> read, CancellationToken cancellationToken) =>
+    private Task<T> ReadSourceAsync<T>(string path, Func<MemoryStream, CancellationToken, T> read,
+        long maximumBytes, CancellationToken cancellationToken) =>
         FileContextOperation.RunAsync(options.OperationTimeout, async token =>
         {
             var metadata = await store.GetMetadataAsync(path, token).ConfigureAwait(false)
                 ?? throw new FileNotFoundException("The document was not found in this file context.", path);
-            if (metadata.Length > (ulong)options.MaximumFullReadBytes)
+            if (metadata.Length > (ulong)maximumBytes)
             { throw new IOException("Document exceeds the configured source read budget."); }
             var source = await store.OpenReadAsync(path, token).ConfigureAwait(false);
             await using var lifetime = source.ConfigureAwait(false);
@@ -40,7 +41,7 @@ public sealed partial class FileContextDocumentService
             int count;
             while ((count = await source.ReadAsync(chunk, token).ConfigureAwait(false)) > 0)
             {
-                if (buffer.Length + count > options.MaximumFullReadBytes)
+                if (buffer.Length + count > maximumBytes)
                 { throw new IOException("Document exceeds the configured source read budget."); }
                 buffer.Write(chunk, 0, count);
             }
