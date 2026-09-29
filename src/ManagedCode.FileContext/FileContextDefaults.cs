@@ -1,3 +1,5 @@
+using ManagedCode.FileContext.Pdf;
+
 namespace ManagedCode.FileContext;
 
 /// <summary>Default limits and selectors used by <see cref="FileContextOptions" />.</summary>
@@ -5,7 +7,7 @@ public static class FileContextDefaults
 {
     public const long MaximumGeneratedFileBytes = 64L * 1024L * 1024L;
     public const int FirstLineNumber = 1;
-    public const int MaximumPdfReadBytes = 25 * 1024 * 1024;
+    public const int MaximumPdfReadBytes = FileContextPdfImages.MaximumPdfBytes;
     public const int MaximumPdfTextCharacters = 50_000;
     public const int MaximumDocxReadBytes = 25 * 1024 * 1024;
     public const int MaximumDocxTextCharacters = 20_000;

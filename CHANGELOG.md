@@ -2,6 +2,10 @@
 
 All notable changes to ManagedCode.FileContext are documented here.
 
+## 1.0.10
+
+- Raise the bounded PDF source read limit from 25 MiB to 100 MiB for scanned documents while retaining per-page pixel and PNG output limits.
+
 ## 1.0.9
 
 - Add a native bounded DOCX text tool with paragraph and character cursors for long documents.

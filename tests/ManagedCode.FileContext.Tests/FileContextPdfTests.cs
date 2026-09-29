@@ -94,6 +94,17 @@ public sealed class FileContextPdfTests
     }
 
     [Fact]
+    public void Pdf_over_the_former_25_mib_limit_reaches_parsing()
+    {
+        var source = new byte[25 * 1024 * 1024 + 1];
+
+        var exception = Record.Exception(() => FileContextPdfImages.RenderPagePng(source, 1));
+
+        exception.ShouldNotBeNull();
+        exception.Message.ShouldNotContain("The PDF exceeds the read limit.");
+    }
+
+    [Fact]
     public async Task Pdf_service_enforces_byte_and_image_index_limits()
     {
         await using var scope = await TestStorageScope.CreateAsync();

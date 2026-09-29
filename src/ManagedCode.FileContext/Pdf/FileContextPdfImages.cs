@@ -6,7 +6,7 @@ namespace ManagedCode.FileContext.Pdf;
 /// <summary>Renders complete PDF pages and extracts embedded page images as PNG.</summary>
 public static class FileContextPdfImages
 {
-    public const int MaximumPdfBytes = 25 * 1024 * 1024;
+    public const int MaximumPdfBytes = 100 * 1024 * 1024;
     public const int MaximumImageBytes = 8 * 1024 * 1024;
     public const int MaximumPixels = 4_000_000;
     public const int MaximumImagesPerPage = 20;
