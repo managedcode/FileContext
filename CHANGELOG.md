@@ -2,6 +2,11 @@
 
 All notable changes to ManagedCode.FileContext are documented here.
 
+## 1.0.8
+
+- Add bounded PDF text/page metadata, full-page PNG rendering, and embedded-image extraction through scoped file tools and public byte APIs.
+- Return image `DataContent` for vision-capable hosts; document the host-side tool-result bridge requirement.
+
 ## 1.0.4
 
 - Reject XLSX in generic text reads and exclude it from text search; use native worksheet/cell tools without exposing binary bytes.

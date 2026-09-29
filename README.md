@@ -45,7 +45,7 @@ flowchart LR
 Requires **.NET 10**. Add FileContext and the storage provider your application uses:
 
 ```bash
-dotnet add package ManagedCode.FileContext --version 1.0.0
+dotnet add package ManagedCode.FileContext --version 1.0.8
 dotnet add package ManagedCode.Storage.FileSystem --version 10.0.7
 ```
 
@@ -130,6 +130,10 @@ Standard `file_access_*` tools come from Agent Framework's `FileAccessProvider`.
 | `file_access_grep` | Search text with case-insensitive regex and optional glob filters | Yes |
 | `file_access_read` | Read an entire text file within the full-read limit | Yes |
 | `file_context_read_range` | Read a bounded, one-based line window | Yes |
+| `file_context_pdf_text` | Read bounded PDF text, page count, and pages without a text layer | Yes |
+| `file_context_pdf_page_image` | Render one complete PDF page as PNG `DataContent` | Yes |
+| `file_context_pdf_images_info` | Count embedded images on one PDF page | Yes |
+| `file_context_pdf_image` | Extract one embedded PDF image as PNG `DataContent` | Yes |
 | `file_context_info` | Return file presence and metadata without reading content | Yes |
 | `file_context_markdown_graph_search` | Build and ranked-search a Markdown knowledge graph | Yes |
 | `file_context_markdown_graph_export` | Export a graph as Mermaid, DOT, Turtle, or JSON-LD | Yes |
@@ -176,6 +180,12 @@ if (page.HasMore)
 ```
 
 Results include `StartLine`, `EndLine`, `HasMore`, and `TotalLines` when the end is reached. Reads stream through the file and retain only bounded content; non-seekable streams are supported. Files above the full-read limit must be accessed through range reads.
+
+## Read PDFs and send pages to vision models
+
+`IFileContextPdf.ReadPdfTextAsync(path)` returns bounded text, `PageCount`, and one-based `PagesWithoutText`. It does not perform OCR. A scanned page can instead be rendered with `RenderPdfPageAsync(path, pageNumber)`, which returns PNG `DataContent`. Use `CountPdfPageImagesAsync` and `ExtractPdfImageAsync` when the original embedded pictures are needed rather than the complete page. The four read-only `file_context_pdf_*` tools expose the same operations from scoped storage.
+
+For an authenticated PDF already held as bytes, `FileContextPdfTextExtractor.Extract`, `FileContextPdfImages.RenderPagePng`, and `FileContextPdfImages.ExtractPageImagesPng` work without storing it. Storage reads enforce `MaximumPdfReadBytes` (25 MiB by default); page rasterization caps pixels and PNG size. A host must pass image `DataContent` to its model as image content. A generic OpenAI Chat function result serializes it as text, so hosts must explicitly bridge image tool results into a multimodal model message.
 
 ## Explore Markdown as a graph
 
@@ -349,7 +359,7 @@ dotnet pack src/ManagedCode.FileContext/ManagedCode.FileContext.csproj --configu
 
 ## Releases and license
 
-Version `1.0.0` is defined centrally in `Directory.Build.props`. Every push to `main` runs the Release workflow: restore, format, build, test with coverage, and pack. For a new package version, it publishes the validated NuGet artifact and creates the matching tag and GitHub release automatically. Already released versions are skipped. To release an update, bump the version, commit, and push; no manual tag is required.
+Version `1.0.8` is defined centrally in `Directory.Build.props`. Every push to `main` runs the Release workflow: restore, format, build, test with coverage, and pack. For a new package version, it publishes the validated NuGet artifact and creates the matching tag and GitHub release automatically. Already released versions are skipped. To release an update, bump the version, commit, and push; no manual tag is required.
 
 [MIT licensed](https://github.com/managedcode/FileContext/blob/main/LICENSE) · Built by [ManagedCode](https://github.com/managedcode)
 

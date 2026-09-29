@@ -19,6 +19,8 @@ public sealed class FileContextOptions
 
     public bool RequireWriteToolApproval { get; set; } = true;
 
+    public int MaximumPdfReadBytes { get; set; } = FileContextDefaults.MaximumPdfReadBytes;
+
     public long MaximumFullReadBytes { get; set; } = FileContextDefaults.MaximumFullReadBytes;
 
     public long MaximumRangeReadBytes { get; set; } = FileContextDefaults.MaximumRangeReadBytes;
@@ -51,6 +53,7 @@ public sealed class FileContextOptions
     internal void Validate()
     {
         ValidatePositive(MaximumGeneratedFileBytes, nameof(MaximumGeneratedFileBytes));
+        ValidatePositive(MaximumPdfReadBytes, nameof(MaximumPdfReadBytes));
         ValidatePositive(MaximumFullReadBytes, nameof(MaximumFullReadBytes));
         ValidatePositive(MaximumRangeReadBytes, nameof(MaximumRangeReadBytes));
         ValidatePositive(DefaultRangeLineCount, nameof(DefaultRangeLineCount));

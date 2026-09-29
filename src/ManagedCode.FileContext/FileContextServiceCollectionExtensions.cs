@@ -19,6 +19,7 @@ public static class FileContextServiceCollectionExtensions
         services.TryAddSingleton<ManagedCodeStorageFileStore>();
         services.TryAddSingleton<AgentFileStore>(static provider => provider.GetRequiredService<ManagedCodeStorageFileStore>());
         services.TryAddSingleton<IFileContext, FileContextService>();
+        services.TryAddSingleton<IFileContextPdf>(static provider => (IFileContextPdf)provider.GetRequiredService<IFileContext>());
         services.TryAddSingleton<FileContextProvider>();
         services.AddSingleton<AIContextProvider>(
             static provider => provider.GetRequiredService<FileContextProvider>());
@@ -49,6 +50,8 @@ public static class FileContextServiceCollectionExtensions
             new ManagedCodeStorageFileStore(provider.GetRequiredKeyedService<IStorage>(key), options));
         services.AddKeyedSingleton<IFileContext>(serviceKey, (provider, key) =>
             new FileContextService(provider.GetRequiredKeyedService<ManagedCodeStorageFileStore>(key), options));
+        services.AddKeyedSingleton<IFileContextPdf>(serviceKey, (provider, key) =>
+            (IFileContextPdf)provider.GetRequiredKeyedService<IFileContext>(key));
         services.AddKeyedSingleton<FileContextProvider>(serviceKey, (provider, key) =>
             new FileContextProvider(
                 provider.GetRequiredKeyedService<ManagedCodeStorageFileStore>(key),

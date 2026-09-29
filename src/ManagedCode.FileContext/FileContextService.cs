@@ -5,7 +5,7 @@ using Microsoft.Extensions.FileSystemGlobbing;
 namespace ManagedCode.FileContext;
 
 /// <summary>Implements bounded file operations and Markdown knowledge-graph materialization.</summary>
-public sealed partial class FileContextService : IFileContext
+public sealed partial class FileContextService : IFileContext, IFileContextPdf
 {
     private readonly ManagedCodeStorageFileStore _fileStore;
     private readonly FileContextOptions _options;

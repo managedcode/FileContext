@@ -10,6 +10,10 @@ public static class FileContextToolNames
     public const string TablesInfo = "file_context_tables_info";
     public const string WorkbookInfo = "file_context_workbook_info";
     public const string WorkbookRange = "file_context_workbook_range";
+    public const string PdfText = "file_context_pdf_text";
+    public const string PdfPageImage = "file_context_pdf_page_image";
+    public const string PdfImage = "file_context_pdf_image";
+    public const string PdfImagesInfo = "file_context_pdf_images_info";
     public const string ReadRange = "file_context_read_range";
     public const string GetInfo = "file_context_info";
     public const string SearchMarkdownGraph = "file_context_markdown_graph_search";

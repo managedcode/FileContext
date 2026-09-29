@@ -8,7 +8,7 @@
     <ThresholdStat>total</ThresholdStat>
     <CoverletOutput>$(MSBuildProjectDirectory)/TestResults/coverage/coverage</CoverletOutput>
     <CoverletOutputFormat>opencover</CoverletOutputFormat>
-    <Exclude>[ManagedCode.FileContext.Tests]*</Exclude>
+    <Include>[ManagedCode.FileContext]*</Include>
   </PropertyGroup>
 
   <ItemGroup>
