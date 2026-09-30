@@ -7,6 +7,7 @@ public static class FileContextDefaults
     public const long MaximumGeneratedFileBytes = 64L * 1024L * 1024L;
     public const int FirstLineNumber = 1;
     public const int MaximumPdfReadBytes = 100 * 1024 * 1024;
+    public const int MaximumConcurrentPdfOperations = 1;
     public const int MaximumImageBytes = 8 * 1024 * 1024;
     public const int MaximumRenderedPagePixels = 4_000_000;
     public const int MaximumImagesPerPdfPage = 20;

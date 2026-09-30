@@ -23,6 +23,9 @@ public sealed class FileContextOptions
 
     public int MaximumPdfReadBytes { get; set; } = FileContextDefaults.MaximumPdfReadBytes;
 
+    /// <summary>Maximum simultaneous PDF reads/renders per shared processor, including source buffering.</summary>
+    public int MaximumConcurrentPdfOperations { get; set; } = FileContextDefaults.MaximumConcurrentPdfOperations;
+
     public int MaximumImageBytes { get; set; } = FileContextDefaults.MaximumImageBytes;
 
     public int MaximumRenderedPagePixels { get; set; } = FileContextDefaults.MaximumRenderedPagePixels;
@@ -75,6 +78,7 @@ public sealed class FileContextOptions
     {
         ValidatePositive(MaximumGeneratedFileBytes, nameof(MaximumGeneratedFileBytes));
         ValidatePositive(MaximumPdfReadBytes, nameof(MaximumPdfReadBytes));
+        ValidatePositive(MaximumConcurrentPdfOperations, nameof(MaximumConcurrentPdfOperations));
         ValidatePositive(MaximumImageBytes, nameof(MaximumImageBytes));
         ValidatePositive(MaximumRenderedPagePixels, nameof(MaximumRenderedPagePixels));
         ValidatePositive(MaximumImagesPerPdfPage, nameof(MaximumImagesPerPdfPage));

@@ -2,6 +2,11 @@
 
 All notable changes to ManagedCode.FileContext are documented here.
 
+## 1.0.12
+
+- Bound native PDF reads and rendering before source buffering through a shared, configurable PDF processor.
+- Expose a disposable render document with page count and sequential page rendering from one parse.
+
 ## 1.0.11
 
 - Bind and validate FileContext limits through `IOptions<FileContextOptions>`, including keyed registrations and host configuration.

@@ -9,13 +9,16 @@ public sealed partial class FileContextService : IFileContext, IFileContextPdf
 {
     private readonly ManagedCodeStorageFileStore _fileStore;
     private readonly FileContextOptions _options;
+    private readonly Pdf.FileContextPdfProcessor _pdfProcessor;
 
     /// <summary>Creates the extended file-context service.</summary>
-    public FileContextService(ManagedCodeStorageFileStore fileStore, FileContextOptions? options = null)
+    public FileContextService(ManagedCodeStorageFileStore fileStore, FileContextOptions? options = null,
+        Pdf.FileContextPdfProcessor? pdfProcessor = null)
     {
         _fileStore = fileStore ?? throw new ArgumentNullException(nameof(fileStore));
         _options = options ?? new FileContextOptions();
         _options.Validate();
+        _pdfProcessor = pdfProcessor ?? Pdf.FileContextPdfProcessor.Shared;
         Documents = new FileContextDocumentService(_fileStore, _options);
     }
 

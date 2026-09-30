@@ -1,3 +1,4 @@
+using ManagedCode.FileContext.Pdf;
 using ManagedCode.Storage.Core;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.Configuration;
@@ -21,6 +22,7 @@ public static class FileContextServiceCollectionExtensions
             builder.Configure(configure);
         }
         AddOptionsValidator(services);
+        AddPdfProcessor(services);
 
         services.TryAddSingleton(static provider => provider.GetRequiredService<IOptions<FileContextOptions>>().Value);
         services.TryAddSingleton<ManagedCodeStorageFileStore>();
@@ -58,6 +60,7 @@ public static class FileContextServiceCollectionExtensions
         }
         AddOptionsValidator(services);
 
+        AddPdfProcessor(services);
         services.AddKeyedSingleton<FileContextOptions>(serviceKey, (provider, _) =>
             provider.GetRequiredService<IOptionsMonitor<FileContextOptions>>().Get(optionsName));
         services.AddKeyedSingleton<ManagedCodeStorageFileStore>(serviceKey, (provider, key) =>
@@ -65,7 +68,8 @@ public static class FileContextServiceCollectionExtensions
                 provider.GetRequiredKeyedService<FileContextOptions>(key)));
         services.AddKeyedSingleton<IFileContext>(serviceKey, (provider, key) =>
             new FileContextService(provider.GetRequiredKeyedService<ManagedCodeStorageFileStore>(key),
-                provider.GetRequiredKeyedService<FileContextOptions>(key)));
+                provider.GetRequiredKeyedService<FileContextOptions>(key),
+                provider.GetRequiredService<FileContextPdfProcessor>()));
         services.AddKeyedSingleton<IFileContextPdf>(serviceKey, (provider, key) =>
             (IFileContextPdf)provider.GetRequiredKeyedService<IFileContext>(key));
         services.AddKeyedSingleton<FileContextProvider>(serviceKey, (provider, key) =>
@@ -88,8 +92,13 @@ public static class FileContextServiceCollectionExtensions
         services.AddOptions<FileContextOptions>()
             .Bind(configuration.GetSection(FileContextOptions.SectionName));
         AddOptionsValidator(services);
+        AddPdfProcessor(services);
         return services;
     }
+
+    private static void AddPdfProcessor(IServiceCollection services) =>
+        services.TryAddSingleton(static provider => new FileContextPdfProcessor(
+            provider.GetRequiredService<IOptions<FileContextOptions>>().Value));
 
     private static void AddOptionsValidator(IServiceCollection services) =>
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<FileContextOptions>, FileContextOptionsValidator>());

@@ -77,6 +77,11 @@ flowchart TD
 
 ## Operational limits
 
+PDF callers share `FileContextPdfProcessor`, acquiring a permit before reading or downloading the
+source and retaining it through parsing/rendering. `MaximumConcurrentPdfOperations` defaults to one.
+`FileContextPdfRenderDocument` exposes page count and sequential page rendering from one parsed PDF;
+dispose it after the batch. The low-level synchronous image helpers remain caller-scheduled APIs.
+
 All potentially large operations are controlled by `IOptions<FileContextOptions>`: PDF source/page/image budgets, full-read bytes, range bytes, files scanned, bytes per searched file, matches per file, total search results, graph documents, graph source bytes, and exported graph characters. Non-seekable cloud streams are supported by sequential streaming.
 
 ## Start here

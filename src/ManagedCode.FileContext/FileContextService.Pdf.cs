@@ -17,20 +17,29 @@ public sealed partial class FileContextService
             throw new ArgumentOutOfRangeException(nameof(maxCharacters));
         }
         return FileContextOperation.RunAsync(_options.OperationTimeout, async token =>
-            FileContextPdfTextExtractor.Extract(await ReadPdfBytesAsync(path, token).ConfigureAwait(false), maxCharacters), cancellationToken);
+        {
+            using var permit = await _pdfProcessor.AcquireAsync(token).ConfigureAwait(false);
+            return FileContextPdfTextExtractor.Extract(await ReadPdfBytesAsync(path, token).ConfigureAwait(false), maxCharacters);
+        }, cancellationToken);
     }
 
     public Task<DataContent> RenderPdfPageAsync(string path, int pageNumber,
         CancellationToken cancellationToken = default) =>
         FileContextOperation.RunAsync(_options.OperationTimeout, async token =>
-            FileContextImageContent.FromPngBytes(FileContextPdfImages.RenderPagePng(
-                await ReadPdfBytesAsync(path, token).ConfigureAwait(false), pageNumber, _options), _options), cancellationToken);
+        {
+            using var permit = await _pdfProcessor.AcquireAsync(token).ConfigureAwait(false);
+            return FileContextImageContent.FromPngBytes(FileContextPdfImages.RenderPagePng(
+                await ReadPdfBytesAsync(path, token).ConfigureAwait(false), pageNumber, _options), _options);
+        }, cancellationToken);
 
     public Task<int> CountPdfPageImagesAsync(string path, int pageNumber,
         CancellationToken cancellationToken = default) =>
         FileContextOperation.RunAsync(_options.OperationTimeout, async token =>
-            FileContextPdfImages.ExtractPageImagesPng(
-                await ReadPdfBytesAsync(path, token).ConfigureAwait(false), pageNumber, _options).Count, cancellationToken);
+        {
+            using var permit = await _pdfProcessor.AcquireAsync(token).ConfigureAwait(false);
+            return FileContextPdfImages.ExtractPageImagesPng(
+                await ReadPdfBytesAsync(path, token).ConfigureAwait(false), pageNumber, _options).Count;
+        }, cancellationToken);
 
     public Task<DataContent> ExtractPdfImageAsync(string path, int pageNumber, int imageNumber,
         CancellationToken cancellationToken = default)
@@ -38,6 +47,7 @@ public sealed partial class FileContextService
         ArgumentOutOfRangeException.ThrowIfLessThan(imageNumber, 1);
         return FileContextOperation.RunAsync(_options.OperationTimeout, async token =>
         {
+            using var permit = await _pdfProcessor.AcquireAsync(token).ConfigureAwait(false);
             var images = FileContextPdfImages.ExtractPageImagesPng(
                 await ReadPdfBytesAsync(path, token).ConfigureAwait(false), pageNumber, _options);
             if (imageNumber > images.Count)

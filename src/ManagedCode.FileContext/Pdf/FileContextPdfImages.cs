@@ -24,29 +24,8 @@ public static class FileContextPdfImages
         double? scale = null)
     {
         ArgumentNullException.ThrowIfNull(options);
-        var settings = ValidateInput(pdf, options);
-        var resolvedScale = scale ?? settings.DefaultPdfPageScale;
-        if (resolvedScale < settings.MinimumPdfPageScale || resolvedScale > settings.MaximumPdfPageScale
-            || !double.IsFinite(resolvedScale))
-        {
-            throw new ArgumentOutOfRangeException(nameof(scale));
-        }
-
-        using var document = PdfDocument.Open(pdf, SkiaRenderingParsingOptions.Instance);
-        ValidatePage(pageNumber, document.NumberOfPages);
-        var page = document.GetPage(pageNumber);
-        if (page.Width * resolvedScale * page.Height * resolvedScale > settings.MaximumRenderedPagePixels)
-        {
-            throw new IOException("The rendered PDF page exceeds the pixel limit.");
-        }
-
-        document.AddSkiaPageFactory();
-        using var image = document.GetPageAsPng(pageNumber, (float)resolvedScale, settings.PdfPngQuality);
-        if (image.Length > settings.MaximumImageBytes)
-        {
-            throw new IOException("The rendered PDF page exceeds the image byte limit.");
-        }
-        return image.ToArray();
+        using var document = new FileContextPdfRenderDocument(pdf, options);
+        return document.RenderPagePng(pageNumber, scale);
     }
 
     /// <summary>Extracts the embedded images on one page; these do not include page text or vector drawings.</summary>
