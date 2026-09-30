@@ -8,16 +8,22 @@ public sealed class FileContextPdfRenderDocument : IDisposable
 {
     private readonly PdfDocument _document;
     private readonly FileContextOptions _options;
+    private readonly Stream _source;
+    private readonly bool _ownedSource;
 
     public FileContextPdfRenderDocument(byte[] pdf, FileContextOptions? options = null)
+        : this(new MemoryStream(pdf ?? throw new ArgumentNullException(nameof(pdf)), writable: false), options)
+    {
+        _ownedSource = true;
+    }
+
+    /// <summary>Parses a seekable source without copying it. The caller owns the stream.</summary>
+    public FileContextPdfRenderDocument(Stream pdf, FileContextOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(pdf);
         _options = (options ?? new FileContextOptions()).Clone();
-        _options.Validate();
-        if (pdf.Length > _options.MaximumPdfReadBytes)
-        {
-            throw new IOException("The PDF exceeds the read limit.");
-        }
+        FileContextPdfSource.Validate(pdf, _options);
+        _source = pdf;
         _document = PdfDocument.Open(pdf, SkiaRenderingParsingOptions.Instance);
         _document.AddSkiaPageFactory();
     }
@@ -41,6 +47,7 @@ public sealed class FileContextPdfRenderDocument : IDisposable
         {
             throw new IOException("The rendered PDF page exceeds the pixel limit.");
         }
+        FileContextPdfImageBudget.Validate(page, _options);
         using var image = _document.GetPageAsPng(pageNumber, (float)resolvedScale, _options.PdfPngQuality);
         if (image.Length > _options.MaximumImageBytes)
         {
@@ -49,5 +56,9 @@ public sealed class FileContextPdfRenderDocument : IDisposable
         return image.ToArray();
     }
 
-    public void Dispose() => _document.Dispose();
+    public void Dispose()
+    {
+        _document.Dispose();
+        if (_ownedSource) { _source.Dispose(); }
+    }
 }

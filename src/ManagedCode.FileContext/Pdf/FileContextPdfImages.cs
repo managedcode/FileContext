@@ -28,6 +28,14 @@ public static class FileContextPdfImages
         return document.RenderPagePng(pageNumber, scale);
     }
 
+    /// <summary>Renders a seekable PDF source without buffering the complete document.</summary>
+    public static byte[] RenderPagePng(Stream pdf, int pageNumber, FileContextOptions? options = null,
+        double? scale = null)
+    {
+        using var document = new FileContextPdfRenderDocument(pdf, options);
+        return document.RenderPagePng(pageNumber, scale);
+    }
+
     /// <summary>Extracts the embedded images on one page; these do not include page text or vector drawings.</summary>
     public static IReadOnlyList<FileContextPdfImage> ExtractPageImagesPng(byte[] pdf, int pageNumber) =>
         ExtractPageImagesPng(pdf, pageNumber, new FileContextOptions());
@@ -37,11 +45,23 @@ public static class FileContextPdfImages
         FileContextOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        var settings = ValidateInput(pdf, options);
+        ValidateInput(pdf, options);
+        using var source = new MemoryStream(pdf, writable: false);
+        return ExtractPageImagesPng(source, pageNumber, options);
+    }
+
+    /// <summary>Extracts embedded images from a bounded seekable source. The caller owns the stream.</summary>
+    public static IReadOnlyList<FileContextPdfImage> ExtractPageImagesPng(Stream pdf, int pageNumber,
+        FileContextOptions? options = null)
+    {
+        var settings = options ?? new FileContextOptions();
+        FileContextPdfSource.Validate(pdf, settings);
         using var document = PdfDocument.Open(pdf, SkiaRenderingParsingOptions.Instance);
         ValidatePage(pageNumber, document.NumberOfPages);
+        var page = document.GetPage(pageNumber);
+        FileContextPdfImageBudget.Validate(page, settings);
         var result = new List<FileContextPdfImage>();
-        foreach (var image in document.GetPage(pageNumber).GetImages())
+        foreach (var image in page.GetImages())
         {
             if (result.Count >= settings.MaximumImagesPerPdfPage)
             {
@@ -60,7 +80,7 @@ public static class FileContextPdfImages
         return result;
     }
 
-    private static FileContextOptions ValidateInput(byte[] pdf, FileContextOptions options)
+    private static void ValidateInput(byte[] pdf, FileContextOptions options)
     {
         ArgumentNullException.ThrowIfNull(pdf);
         options.Validate();
@@ -68,7 +88,6 @@ public static class FileContextPdfImages
         {
             throw new IOException("The PDF exceeds the read limit.");
         }
-        return options;
     }
 
     private static void ValidatePage(int pageNumber, int pageCount)

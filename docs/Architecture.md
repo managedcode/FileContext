@@ -82,6 +82,8 @@ source and retaining it through parsing/rendering. `MaximumConcurrentPdfOperatio
 `FileContextPdfRenderDocument` exposes page count and sequential page rendering from one parsed PDF;
 dispose it after the batch. The low-level synchronous image helpers remain caller-scheduled APIs.
 
+PDF text, page rendering and embedded-image APIs accept bounded seekable streams. Storage-backed PDF tools keep seekable provider streams directly and stage non-seekable sources to an automatically deleted temporary file, never a whole-document managed array. Native raster decoding has a separate per-page source-image pixel budget; lowering output scale does not reduce source bitmap allocation.
+
 All potentially large operations are controlled by `IOptions<FileContextOptions>`: PDF source/page/image budgets, full-read bytes, range bytes, files scanned, bytes per searched file, matches per file, total search results, graph documents, graph source bytes, and exported graph characters. Non-seekable cloud streams are supported by sequential streaming.
 
 ## Start here

@@ -39,6 +39,17 @@ public static class FileContextPdfTextExtractor
     /// <summary>Extracts the text layer, keeping at most <paramref name="maxRetainedChars"/> characters of it.</summary>
     public static FileContextPdfText Extract(byte[] pdf, int maxRetainedChars)
     {
+        ArgumentNullException.ThrowIfNull(pdf);
+        using var source = new MemoryStream(pdf, writable: false);
+        return Extract(source, maxRetainedChars);
+    }
+
+    /// <summary>Extracts bounded text from a seekable source without copying the PDF. The caller owns the stream.</summary>
+    public static FileContextPdfText Extract(Stream pdf, int maxRetainedChars, FileContextOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
+        ArgumentOutOfRangeException.ThrowIfNegative(maxRetainedChars);
+        FileContextPdfSource.Validate(pdf, options ?? new FileContextOptions());
         PdfDocument document;
         try
         {

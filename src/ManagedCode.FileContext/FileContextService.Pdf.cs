@@ -6,7 +6,6 @@ namespace ManagedCode.FileContext;
 public sealed partial class FileContextService
 {
     private const string PdfExtension = ".pdf";
-    private const int CopyBufferSize = 81920;
 
     public Task<FileContextPdfText> ReadPdfTextAsync(string path,
         int maxCharacters = FileContextDefaults.MaximumPdfTextCharacters,
@@ -19,7 +18,9 @@ public sealed partial class FileContextService
         return FileContextOperation.RunAsync(_options.OperationTimeout, async token =>
         {
             using var permit = await _pdfProcessor.AcquireAsync(token).ConfigureAwait(false);
-            return FileContextPdfTextExtractor.Extract(await ReadPdfBytesAsync(path, token).ConfigureAwait(false), maxCharacters);
+            var source = await OpenPdfAsync(path, token).ConfigureAwait(false);
+            await using var sourceLifetime = source.ConfigureAwait(false);
+            return FileContextPdfTextExtractor.Extract(source.Stream, maxCharacters, _options);
         }, cancellationToken);
     }
 
@@ -28,8 +29,10 @@ public sealed partial class FileContextService
         FileContextOperation.RunAsync(_options.OperationTimeout, async token =>
         {
             using var permit = await _pdfProcessor.AcquireAsync(token).ConfigureAwait(false);
+            var source = await OpenPdfAsync(path, token).ConfigureAwait(false);
+            await using var sourceLifetime = source.ConfigureAwait(false);
             return FileContextImageContent.FromPngBytes(FileContextPdfImages.RenderPagePng(
-                await ReadPdfBytesAsync(path, token).ConfigureAwait(false), pageNumber, _options), _options);
+                source.Stream, pageNumber, _options), _options);
         }, cancellationToken);
 
     public Task<int> CountPdfPageImagesAsync(string path, int pageNumber,
@@ -37,8 +40,9 @@ public sealed partial class FileContextService
         FileContextOperation.RunAsync(_options.OperationTimeout, async token =>
         {
             using var permit = await _pdfProcessor.AcquireAsync(token).ConfigureAwait(false);
-            return FileContextPdfImages.ExtractPageImagesPng(
-                await ReadPdfBytesAsync(path, token).ConfigureAwait(false), pageNumber, _options).Count;
+            var source = await OpenPdfAsync(path, token).ConfigureAwait(false);
+            await using var sourceLifetime = source.ConfigureAwait(false);
+            return FileContextPdfImages.ExtractPageImagesPng(source.Stream, pageNumber, _options).Count;
         }, cancellationToken);
 
     public Task<DataContent> ExtractPdfImageAsync(string path, int pageNumber, int imageNumber,
@@ -48,8 +52,9 @@ public sealed partial class FileContextService
         return FileContextOperation.RunAsync(_options.OperationTimeout, async token =>
         {
             using var permit = await _pdfProcessor.AcquireAsync(token).ConfigureAwait(false);
-            var images = FileContextPdfImages.ExtractPageImagesPng(
-                await ReadPdfBytesAsync(path, token).ConfigureAwait(false), pageNumber, _options);
+            var source = await OpenPdfAsync(path, token).ConfigureAwait(false);
+            await using var sourceLifetime = source.ConfigureAwait(false);
+            var images = FileContextPdfImages.ExtractPageImagesPng(source.Stream, pageNumber, _options);
             if (imageNumber > images.Count)
             {
                 throw new InvalidOperationException("The embedded image number is outside this PDF page.");
@@ -58,7 +63,7 @@ public sealed partial class FileContextService
         }, cancellationToken);
     }
 
-    private async Task<byte[]> ReadPdfBytesAsync(string path, CancellationToken cancellationToken)
+    private async Task<FileContextPdfSource> OpenPdfAsync(string path, CancellationToken cancellationToken)
     {
         if (!string.Equals(Path.GetExtension(StoragePathScope.Normalize(path)), PdfExtension, StringComparison.OrdinalIgnoreCase))
         {
@@ -70,21 +75,8 @@ public sealed partial class FileContextService
         {
             throw new IOException("The PDF exceeds the read limit.");
         }
-        var source = await _fileStore.OpenReadAsync(path, cancellationToken).ConfigureAwait(false);
-        await using (source.ConfigureAwait(false))
-        {
-            using var output = new MemoryStream();
-            var buffer = new byte[CopyBufferSize];
-            int read;
-            while ((read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
-            {
-                if (output.Length + read > _options.MaximumPdfReadBytes)
-                {
-                    throw new IOException("The PDF exceeds the read limit.");
-                }
-                await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
-            }
-            return output.ToArray();
-        }
+        return await FileContextPdfSource.OpenAsync(
+            await _fileStore.OpenReadAsync(path, cancellationToken).ConfigureAwait(false), _options, cancellationToken)
+            .ConfigureAwait(false);
     }
 }

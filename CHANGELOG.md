@@ -2,6 +2,12 @@
 
 All notable changes to ManagedCode.FileContext are documented here.
 
+## 1.0.13
+
+- Parse PDF text, pages and embedded images from bounded seekable streams instead of whole-document arrays.
+- Stage non-seekable storage sources to automatically deleted temporary files with cancellation and size limits.
+- Validate total source-image pixels before native decoding, independent of rendered output scale.
+
 ## 1.0.12
 
 - Bound native PDF reads and rendering before source buffering through a shared, configurable PDF processor.

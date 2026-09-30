@@ -28,6 +28,9 @@ public sealed class FileContextOptions
 
     public int MaximumImageBytes { get; set; } = FileContextDefaults.MaximumImageBytes;
 
+    /// <summary>Maximum total source-image pixels decoded on one PDF page, independent of output scale.</summary>
+    public int MaximumDecodedPdfImagePixels { get; set; } = FileContextDefaults.MaximumDecodedPdfImagePixels;
+
     public int MaximumRenderedPagePixels { get; set; } = FileContextDefaults.MaximumRenderedPagePixels;
 
     public int MaximumImagesPerPdfPage { get; set; } = FileContextDefaults.MaximumImagesPerPdfPage;
@@ -80,6 +83,7 @@ public sealed class FileContextOptions
         ValidatePositive(MaximumPdfReadBytes, nameof(MaximumPdfReadBytes));
         ValidatePositive(MaximumConcurrentPdfOperations, nameof(MaximumConcurrentPdfOperations));
         ValidatePositive(MaximumImageBytes, nameof(MaximumImageBytes));
+        ValidatePositive(MaximumDecodedPdfImagePixels, nameof(MaximumDecodedPdfImagePixels));
         ValidatePositive(MaximumRenderedPagePixels, nameof(MaximumRenderedPagePixels));
         ValidatePositive(MaximumImagesPerPdfPage, nameof(MaximumImagesPerPdfPage));
         if (!double.IsFinite(MinimumPdfPageScale) || MinimumPdfPageScale <= 0
