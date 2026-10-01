@@ -8,6 +8,7 @@ public static class FileContextDefaults
     public const int FirstLineNumber = 1;
     public const int MaximumPdfReadBytes = 100 * 1024 * 1024;
     public const int MaximumConcurrentPdfOperations = 1;
+    public const int PdfSourceBufferBytes = 81920;
     public const int MaximumImageBytes = 8 * 1024 * 1024;
     public const int MaximumDecodedPdfImagePixels = 32_000_000;
     public const int MaximumRenderedPagePixels = 4_000_000;

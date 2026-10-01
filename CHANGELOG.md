@@ -2,6 +2,12 @@
 
 All notable changes to ManagedCode.FileContext are documented here.
 
+## 1.0.14
+
+- Stage seekable cloud PDF streams asynchronously to bounded temporary files before synchronous parser reads and seeks.
+- Preserve local file/memory sources by default and expose typed staging mode, buffer size and temporary-directory options.
+- Return pooled staging buffers and delete temporary sources on completion, cancellation and failures.
+
 ## 1.0.13
 
 - Parse PDF text, pages and embedded images from bounded seekable streams instead of whole-document arrays.

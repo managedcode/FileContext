@@ -185,6 +185,12 @@ Results include `StartLine`, `EndLine`, `HasMore`, and `TotalLines` when the end
 
 ## Read PDFs and send pages to vision models
 
+Storage-backed PDF tools stage seekable cloud streams asynchronously before parsing. PdfPig's
+synchronous reads and seeks then use a temporary file rather than repeated network ranges. Local
+seekable files and memory streams remain reusable. `PdfSourceStagingMode` can force `TemporaryFile`
+staging, `PdfSourceBufferBytes` bounds the copy buffer, and `PdfTemporaryDirectory` optionally selects
+an existing host directory. Disposal, cancellation and staging failures remove temporary sources.
+
 `IFileContextPdf.ReadPdfTextAsync(path)` returns bounded text, `PageCount`, and one-based `PagesWithoutText`. It does not perform OCR. A scanned page can instead be rendered with `RenderPdfPageAsync(path, pageNumber)`, which returns PNG `DataContent`. Use `CountPdfPageImagesAsync` and `ExtractPdfImageAsync` when the original embedded pictures are needed rather than the complete page. The four read-only `file_context_pdf_*` tools expose the same operations from scoped storage.
 
 For an authenticated PDF already held as bytes, `FileContextPdfTextExtractor.Extract`, `FileContextPdfImages.RenderPagePng`, and `FileContextPdfImages.ExtractPageImagesPng` work without storing it. PDF source reads default to 100 MiB and accept `FileContextOptions` for a different limit; page rasterization also uses configured pixel and PNG limits. `FileContextImageContent` creates model-visible `DataContent` from PNG bytes or base64 and `UriContent` from an HTTPS URL. A URL reference is not fetched by FileContext, so the model provider must be able to access it. A host must pass image content to its model as image content. A generic OpenAI Chat function result serializes it as text, so hosts must explicitly bridge image tool results into a multimodal model message.
