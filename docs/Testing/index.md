@@ -10,6 +10,7 @@ The suite is integration-first:
 - timeout tests cover configured operation expiry, cancellation of every public operation, disabled deadlines, duration validation, and timeout tool results through restored sessions;
 - concurrent storage tests write and range-read eight independent files through one shared adapter/service;
 - a sparse 1 GiB filesystem test reads bounded line windows repeatedly, rejects full-file loading, caps allocations, and proves that an oversized line fails before it can be buffered in memory.
+- PDF cloud-source tests use real files behind an async-only seekable stream, proving parsing uses the staged local file; they cover large inputs, configured buffers/directories, forced staging, local-file reuse, limits, mid-copy cancellation, failure cleanup and private Unix permissions.
 
 Every filesystem test owns a unique temporary root and removes it on disposal. Test execution is serialized so process-wide allocation assertions cannot be distorted by another test. No `IStorage`, Agent Framework, Markdown-LD, or LlmTck mocks are used.
 

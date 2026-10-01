@@ -1,3 +1,5 @@
+using ManagedCode.FileContext.Pdf;
+
 namespace ManagedCode.FileContext;
 
 /// <summary>Controls file access, approval, search, and graph limits for one context provider.</summary>
@@ -22,6 +24,15 @@ public sealed class FileContextOptions
     public bool RequireWriteToolApproval { get; set; } = true;
 
     public int MaximumPdfReadBytes { get; set; } = FileContextDefaults.MaximumPdfReadBytes;
+
+    /// <summary>Stages cloud streams before synchronous parsing; Automatic reuses local files and memory.</summary>
+    public FileContextPdfSourceStagingMode PdfSourceStagingMode { get; set; } = FileContextPdfSourceStagingMode.Automatic;
+
+    /// <summary>Maximum bytes requested by one asynchronous PDF source staging read.</summary>
+    public int PdfSourceBufferBytes { get; set; } = FileContextDefaults.PdfSourceBufferBytes;
+
+    /// <summary>Existing directory for temporary PDF sources. Null uses the operating system's temp directory.</summary>
+    public string? PdfTemporaryDirectory { get; set; }
 
     /// <summary>Maximum simultaneous PDF reads/renders per shared processor, including source buffering.</summary>
     public int MaximumConcurrentPdfOperations { get; set; } = FileContextDefaults.MaximumConcurrentPdfOperations;
@@ -81,6 +92,16 @@ public sealed class FileContextOptions
     {
         ValidatePositive(MaximumGeneratedFileBytes, nameof(MaximumGeneratedFileBytes));
         ValidatePositive(MaximumPdfReadBytes, nameof(MaximumPdfReadBytes));
+        ValidatePositive(PdfSourceBufferBytes, nameof(PdfSourceBufferBytes));
+        if (PdfSourceStagingMode is not FileContextPdfSourceStagingMode.Automatic
+            and not FileContextPdfSourceStagingMode.TemporaryFile)
+        {
+            throw new InvalidOperationException("The PDF source staging mode is invalid.");
+        }
+        if (PdfTemporaryDirectory is not null && string.IsNullOrWhiteSpace(PdfTemporaryDirectory))
+        {
+            throw new InvalidOperationException("The PDF temporary directory must be a nonempty path or null.");
+        }
         ValidatePositive(MaximumConcurrentPdfOperations, nameof(MaximumConcurrentPdfOperations));
         ValidatePositive(MaximumImageBytes, nameof(MaximumImageBytes));
         ValidatePositive(MaximumDecodedPdfImagePixels, nameof(MaximumDecodedPdfImagePixels));

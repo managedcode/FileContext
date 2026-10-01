@@ -115,6 +115,13 @@ Verification: DocumentCreationTests and DocumentValidationTests reopen real form
 
 ## PDF reads and vision images
 
+PDF source staging keeps synchronous parser I/O local. The default `Automatic` mode reuses
+seekable `FileStream` and `MemoryStream` sources and asynchronously stages all other inputs,
+including seekable cloud streams. `TemporaryFile` stages every source. The configured
+`PdfSourceBufferBytes` bounds each asynchronous copy read; `PdfTemporaryDirectory` may name an
+existing host directory. Size rejection, cancellation and copy failures dispose the input and
+delete any staged file. Source ownership continues through document rendering and caller disposal.
+
 DOCX reading uses the native `file_context_docx_text` tool. It reads ordinary paragraph and table
 text from the scoped `.docx` package in bounded windows. Each result includes the next paragraph
 and character offset when more text remains, so an agent can continue without loading a long
