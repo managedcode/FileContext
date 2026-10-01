@@ -6,16 +6,16 @@
   <ItemGroup>
     <GlobalPackageReference Include="Meziantou.Analyzer" Version="3.0.290" PrivateAssets="all" />
     <GlobalPackageReference Include="Roslynator.Analyzers" Version="5.0.0" PrivateAssets="all" />
-    <GlobalPackageReference Include="SonarAnalyzer.CSharp" Version="10.34.0.3385" PrivateAssets="all" />
+    <GlobalPackageReference Include="SonarAnalyzer.CSharp" Version="10.35.0.4138" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
     <PackageVersion Include="DocumentFormat.OpenXml" Version="3.5.1" />
     <PackageVersion Include="PdfPig" Version="0.1.16" />
     <PackageVersion Include="PdfPig.Rendering.Skia" Version="0.1.16.4" />
-    <PackageVersion Include="SkiaSharp" Version="4.151.2" />
-    <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.151.2" />
-    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
-    <PackageVersion Include="coverlet.msbuild" Version="10.0.1" />
+    <PackageVersion Include="SkiaSharp" Version="4.153.1" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.153.1" />
+    <PackageVersion Include="coverlet.collector" Version="10.1.0" />
+    <PackageVersion Include="coverlet.msbuild" Version="10.1.0" />
     <PackageVersion Include="DotNet.ReproducibleBuilds" Version="2.0.5" />
     <PackageVersion Include="ManagedCode.LlmTck" Version="0.1.4" />
     <PackageVersion Include="ManagedCode.LlmTck.Client" Version="0.1.4" />
@@ -24,7 +24,7 @@
     <PackageVersion Include="ManagedCode.MarkdownLd.Kb" Version="0.2.10" />
     <PackageVersion Include="ManagedCode.Storage.Core" Version="10.0.13" />
     <PackageVersion Include="ManagedCode.Storage.FileSystem" Version="10.0.13" />
-    <PackageVersion Include="Microsoft.Agents.AI" Version="1.22.0" />
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.23.0" />
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.10.0" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
