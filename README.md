@@ -2,11 +2,13 @@
 
 **Give your .NET agents a workspace they can explore, understand, and edit.**
 
-[![NuGet](https://img.shields.io/nuget/v/ManagedCode.FileContext.svg)](https://www.nuget.org/packages/ManagedCode.FileContext)
+[![NuGet](https://img.shields.io/nuget/v/ManagedCode.FileContext.svg?style=flat-square&logo=nuget)](https://www.nuget.org/packages/ManagedCode.FileContext)
 [![Build](https://github.com/managedcode/FileContext/actions/workflows/ci.yml/badge.svg)](https://github.com/managedcode/FileContext/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/managedcode/FileContext/actions/workflows/codeql.yml/badge.svg)](https://github.com/managedcode/FileContext/actions/workflows/codeql.yml)
 [![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)](https://dotnet.microsoft.com/)
 [![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/managedcode/FileContext/blob/main/LICENSE)
+[![Release](https://github.com/managedcode/FileContext/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/managedcode/FileContext/actions/workflows/release.yml)
+[![Downloads](https://img.shields.io/nuget/dt/ManagedCode.FileContext.svg?style=flat-square&logo=nuget)](https://www.nuget.org/packages/ManagedCode.FileContext)
 
 FileContext connects [ManagedCode.Storage](https://github.com/managedcode/Storage) to **Microsoft Agent Framework**. Agents can discover files, search their contents, read relevant line ranges, and work across Markdown documents as a knowledge graph. Enable write tools when the agent needs to create or edit files.
 
@@ -43,17 +45,19 @@ flowchart LR
 
 ## Install
 
+Install the latest stable release from [NuGet](https://www.nuget.org/packages/ManagedCode.FileContext):
+
 Requires **.NET 10**. Add FileContext and the storage provider your application uses:
 
 ```bash
-dotnet add package ManagedCode.FileContext --version 1.0.9
-dotnet add package ManagedCode.Storage.FileSystem --version 10.0.7
+dotnet add package ManagedCode.FileContext
+dotnet add package ManagedCode.Storage.FileSystem
 ```
 
 The examples below also use the DI service-provider implementation:
 
 ```bash
-dotnet add package Microsoft.Extensions.DependencyInjection --version 10.0.11
+dotnet add package Microsoft.Extensions.DependencyInjection
 ```
 
 ## Quick start
@@ -384,13 +388,13 @@ dotnet pack src/ManagedCode.FileContext/ManagedCode.FileContext.csproj --configu
 
 ## Releases and license
 
-Version `1.0.9` is defined centrally in `Directory.Build.props`. Every push to `main` runs the Release workflow: restore, format, build, test with coverage, and pack. For a new package version, it publishes the validated NuGet artifact and creates the matching tag and GitHub release automatically. Already released versions are skipped. To release an update, bump the version, commit, and push; no manual tag is required.
+The package version is defined centrally in `Directory.Build.props`. Every push to `main` runs the Release workflow: restore, format, build, test with coverage, and pack. For a new package version, it publishes the validated NuGet artifact and creates the matching tag and GitHub release automatically. Already released versions are skipped. To release an update, bump the version, commit, and push; no manual tag is required.
 
 [MIT licensed](https://github.com/managedcode/FileContext/blob/main/LICENSE) · Built by [ManagedCode](https://github.com/managedcode)
 
 ## Create text, CSV, Excel and PDF
 
-Version 1.0.1 adds native document tools to the same scoped FileContext used for reads, listing and metadata. Set `EnableWriteTools = true` on the shared options passed to the store, service and provider. Creation tools retain human approval by default. Each result has a unique `outputs/<id>/<name>` path, content type and byte length; creation never overwrites another file. Hosts own download URLs and user authorization.
+FileContext provides native document tools to the same scoped FileContext used for reads, listing and metadata. Set `EnableWriteTools = true` on the shared options passed to the store, service and provider. Creation tools retain human approval by default. Each result has a unique `outputs/<id>/<name>` path, content type and byte length; creation never overwrites another file. Hosts own download URLs and user authorization.
 
 ```csharp
 var options = new FileContextOptions
