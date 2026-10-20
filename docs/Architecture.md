@@ -67,11 +67,11 @@ flowchart TD
   Product --> Extensions["Microsoft.Extensions.*"]
   Tests["ManagedCode.FileContext.Tests"] --> Product
   Tests --> FileSystem["ManagedCode.Storage.FileSystem"]
-  Tests --> LlmTck["ManagedCode.LlmTck"]
+  Tests --> LlmTestServer["ManagedCode.LlmTestServer"]
 ```
 
 - Product code may depend on `ManagedCode.Storage.Core` but never a concrete provider. PDF inspection uses PdfPig; page rasterization uses the Apache-2.0 PdfPig Skia renderer and returns bounded PNG content to the host.
-- Tests own concrete filesystem storage, LlmTck hosting, and OpenAI-compatible protocol dependencies.
+- Tests own concrete filesystem storage, LlmTestServer hosting, and OpenAI-compatible protocol dependencies.
 - Microsoft owns the standard file-access tool names and behavior. This package adapts storage and adds only complementary tools.
 - File contents remain untrusted data and are never elevated to system instructions.
 

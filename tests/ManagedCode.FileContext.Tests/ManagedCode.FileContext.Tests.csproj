@@ -20,10 +20,10 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="ManagedCode.LlmTck" />
-    <PackageReference Include="ManagedCode.LlmTck.Client" />
-    <PackageReference Include="ManagedCode.LlmTck.Hosting" />
-    <PackageReference Include="ManagedCode.LlmTck.OpenAI" />
+    <PackageReference Include="ManagedCode.LlmTestServer" />
+    <PackageReference Include="ManagedCode.LlmTestServer.Client" />
+    <PackageReference Include="ManagedCode.LlmTestServer.Hosting" />
+    <PackageReference Include="ManagedCode.LlmTestServer.OpenAI" />
     <PackageReference Include="ManagedCode.Storage.FileSystem" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

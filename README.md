@@ -362,7 +362,7 @@ Here, 30 seconds is an example budget, not a library default. The configured ope
 
 ## Verified with real integrations
 
-The suite runs against real filesystem storage, real Markdown graph builds, and an in-process LlmTck HTTP service using Agent Framework's actual function-invocation pipeline. No live model or API key is required.
+The suite runs against real filesystem storage, real Markdown graph builds, and an in-process LlmTestServer HTTP service using Agent Framework's actual function-invocation pipeline. No live model or API key is required.
 
 Coverage includes all advertised tools, empty/error results, restored sessions, concurrent file operations, Unicode buffer boundaries, and bounded range reads from a sparse **1 GiB** file. CI enforces **at least 95% product line coverage**, formatting, static analysis, build, tests, and package validation.
 

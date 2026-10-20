@@ -84,8 +84,8 @@ Independent writes and range reads on eight different files are tested concurren
 6. Markdown graph build, ranked search, current-content rebuild, and all export formats.
 7. Default and keyed Microsoft DI resolution.
 8. Agent Framework receives standard and extended tools from `FileContextProvider`.
-9. A real Agent Framework loop receives an LlmTck tool call, executes storage-backed `file_access_read`, proves the file content reaches the second model request, and returns the expected final answer.
-10. LlmTck tool loops exercise every read-only, mutation, and extended tool against the real filesystem provider.
+9. A real Agent Framework loop receives an LlmTestServer tool call, executes storage-backed `file_access_read`, proves the file content reaches the second model request, and returns the expected final answer.
+10. LlmTestServer tool loops exercise every read-only, mutation, and extended tool against the real filesystem provider.
 11. A sparse 1 GiB file supports bounded repeated range reads without proportional allocation; a giant unterminated line fails at the configured byte boundary.
 12. The packed `1.0.9` package installs and runs in a clean smoke project.
 
@@ -111,7 +111,7 @@ sequenceDiagram
   Agent->>Store: List / info / read the same path
 ```
 
-Verification: DocumentCreationTests and DocumentValidationTests reopen real formats and test boundary failures; FileDocumentCreationLlmTckTests exercises CSV/XLSX/PDF through real model tool calls and checks closed call/result history.
+Verification: DocumentCreationTests and DocumentValidationTests reopen real formats and test boundary failures; FileDocumentCreationLlmTestServerTests exercises CSV/XLSX/PDF through real model tool calls and checks closed call/result history.
 
 ## PDF reads and vision images
 

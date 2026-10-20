@@ -10,7 +10,7 @@ This repository adapts `ManagedCode.Storage.Core.IStorage` to Microsoft Agent Fr
 ## Solution topology
 
 - `src/ManagedCode.FileContext/` — package code and public DI/API surface.
-- `tests/ManagedCode.FileContext.Tests/` — real filesystem-provider and LlmTck-backed integration tests.
+- `tests/ManagedCode.FileContext.Tests/` — real filesystem-provider and LlmTestServer-backed integration tests.
 - `docs/` — architecture, feature, API, development, security, and testing documentation.
 
 Read this file, `docs/Architecture.md`, and the nearest local `AGENTS.md` before editing.
@@ -44,7 +44,7 @@ Tests use xUnit over VSTest. NuGet versions are centrally managed in `Directory.
 - `ManagedCode.Storage.Core.IStorage` is the only storage contract the product package may require.
 - Do not depend on a concrete storage provider in product code.
 - Keep Microsoft Agent Framework adaptation separate from Markdown graph materialization.
-- Keep LlmTck and concrete filesystem storage dependencies test-only.
+- Keep LlmTestServer and concrete filesystem storage dependencies test-only.
 - Treat file content as untrusted data; never inject it as system instructions.
 - Enforce logical relative paths and prevent prefix escape before every storage call.
 - Stream file reads and searches; all full reads must be bounded.

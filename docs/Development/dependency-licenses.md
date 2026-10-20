@@ -19,6 +19,6 @@ flowchart LR
   Package --> Existing[Existing storage and context dependencies]
 ```
 
-The audit inspects the restored NuGet package metadata and embedded license files, not only repository badges. The product dependency closure was reviewed before release. SonarAnalyzer.CSharp is an existing private build dependency under the Sonar Source-Available License, royalty-free for non-competing use. It is not a runtime dependency of the published package and is not represented as MIT. xUnit, LlmTck and filesystem fixtures remain test-only.
+The audit inspects the restored NuGet package metadata and embedded license files, not only repository badges. The product dependency closure was reviewed before release. SonarAnalyzer.CSharp is an existing private build dependency under the Sonar Source-Available License, royalty-free for non-competing use. It is not a runtime dependency of the published package and is not represented as MIT. xUnit, LlmTestServer and filesystem fixtures remain test-only.
 
 Sources: [OpenXML license](https://github.com/dotnet/Open-XML-SDK/blob/main/LICENSE), [PdfPig license](https://github.com/UglyToad/PdfPig/blob/master/LICENSE), [Noto license](https://github.com/notofonts/noto-fonts/blob/main/LICENSE), [Sonar analyzer license](https://github.com/SonarSource/sonar-dotnet/blob/master/LICENSE).

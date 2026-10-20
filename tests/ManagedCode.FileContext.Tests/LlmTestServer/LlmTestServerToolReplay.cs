@@ -1,15 +1,15 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using ManagedCode.LlmTck.OpenAI;
-using ManagedCode.LlmTck.Runtime;
+using ManagedCode.LlmTestServer.OpenAI;
+using ManagedCode.LlmTestServer.Runtime;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace ManagedCode.FileContext.Tests.LlmTck;
+namespace ManagedCode.FileContext.Tests.LlmTestServer;
 
-internal static class LlmTckToolReplay
+internal static class LlmTestServerToolReplay
 {
     private const string RoutePrefix = "/tool-replay/openai/v1";
     private const string ReplayKind = "tool_call";
@@ -31,14 +31,14 @@ internal static class LlmTckToolReplay
         using var arguments = JsonDocument.Parse(argumentsJson);
         return JsonSerializer.Serialize(new
         {
-            llmTckReplayKind = ReplayKind,
+            llmTestServerReplayKind = ReplayKind,
             callId,
             toolName,
             arguments = arguments.RootElement,
         }, JsonOptions);
     }
 
-    public static IEndpointRouteBuilder MapLlmTckToolReplay(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapLlmTestServerToolReplay(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost($"{RoutePrefix}/chat/completions", CompleteChatAsync);
         return endpoints;
@@ -46,7 +46,7 @@ internal static class LlmTckToolReplay
 
     private static async Task<IResult> CompleteChatAsync(
         HttpContext context,
-        ILlmTckRuntime runtime,
+        ILlmTestServerRuntime runtime,
         CancellationToken cancellationToken)
     {
         context.Request.EnableBuffering();
@@ -107,7 +107,7 @@ internal static class LlmTckToolReplay
         id = $"chatcmpl-{Guid.NewGuid():N}",
         @object = "chat.completion",
         created = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-        model = FileContextAgentLlmTckTests.Model,
+        model = FileContextAgentLlmTestServerTests.Model,
         choices = new[]
         {
             new
@@ -132,7 +132,7 @@ internal static class LlmTckToolReplay
     private sealed record ToolCallEnvelope(string CallId, string ToolName, string ArgumentsJson);
 
     private sealed record ToolCallPayload(
-        [property: JsonPropertyName("llmTckReplayKind")] string? Kind,
+        [property: JsonPropertyName("llmTestServerReplayKind")] string? Kind,
         string? CallId,
         string? ToolName,
         JsonElement Arguments);

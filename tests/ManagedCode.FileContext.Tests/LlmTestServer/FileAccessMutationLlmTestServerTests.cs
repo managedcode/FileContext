@@ -1,13 +1,13 @@
 using System.ClientModel;
-using ManagedCode.LlmTck.Configuration;
-using ManagedCode.LlmTck.Models;
+using ManagedCode.LlmTestServer.Configuration;
+using ManagedCode.LlmTestServer.Models;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using OpenAI;
 
-namespace ManagedCode.FileContext.Tests.LlmTck;
+namespace ManagedCode.FileContext.Tests.LlmTestServer;
 
-public sealed class FileAccessMutationLlmTckTests
+public sealed class FileAccessMutationLlmTestServerTests
 {
     private const string FileName = "notes.txt";
     private const string ExpectedAgentResponse = "The requested file mutation completed.";
@@ -24,8 +24,8 @@ public sealed class FileAccessMutationLlmTckTests
         string? expectedContent)
     {
         var prompt = $"Invoke {toolName}.";
-        LlmTckToolReplay.Reset();
-        await using var host = new LlmTckTestHost(() => CreateConfiguration(prompt, toolName, arguments));
+        LlmTestServerToolReplay.Reset();
+        await using var host = new LlmTestServerTestHost(() => CreateConfiguration(prompt, toolName, arguments));
         await host.StartAsync();
         await using var storage = await TestStorageScope.CreateAsync();
         var store = new ManagedCodeStorageFileStore(storage.Storage);
@@ -44,9 +44,9 @@ public sealed class FileAccessMutationLlmTckTests
                 RequireWriteToolApproval = false,
             });
         var sdk = new OpenAIClient(
-            new ApiKeyCredential("not-required-by-llm-tck"),
-            new OpenAIClientOptions { Endpoint = LlmTckToolReplay.CreateRouteUri(host.Endpoint) });
-        using var chatClient = sdk.GetChatClient(FileContextAgentLlmTckTests.Model)
+            new ApiKeyCredential("not-required-by-llm-test-server"),
+            new OpenAIClientOptions { Endpoint = LlmTestServerToolReplay.CreateRouteUri(host.Endpoint) });
+        using var chatClient = sdk.GetChatClient(FileContextAgentLlmTestServerTests.Model)
             .AsIChatClient()
             .AsBuilder()
             .UseAIContextProviders(contextProvider)
@@ -58,10 +58,10 @@ public sealed class FileAccessMutationLlmTckTests
 
         response.Text.ShouldBe(ExpectedAgentResponse);
         (await store.ReadAsync(FileName)).ShouldBe(expectedContent);
-        LlmTckToolReplay.RecordedRequests.Count.ShouldBe(2);
-        LlmTckToolReplay.RecordedRequests[0].ShouldContain(toolName);
-        var results = LlmTckToolAssertions.AssertClosedCalls(
-            LlmTckToolReplay.RecordedRequests[1], $"call-{toolName}");
+        LlmTestServerToolReplay.RecordedRequests.Count.ShouldBe(2);
+        LlmTestServerToolReplay.RecordedRequests[0].ShouldContain(toolName);
+        var results = LlmTestServerToolAssertions.AssertClosedCalls(
+            LlmTestServerToolReplay.RecordedRequests[1], $"call-{toolName}");
         results[0].GetProperty("content").GetString().ShouldNotBeNullOrWhiteSpace();
         var assertions = await host.GetAssertionsAsync();
         assertions.Matched.ShouldBe(2);
@@ -69,14 +69,14 @@ public sealed class FileAccessMutationLlmTckTests
         assertions.ScenarioExhausted.ShouldBe(0);
     }
 
-    private static LlmTckConfiguration CreateConfiguration(string prompt, string toolName, string arguments)
+    private static LlmTestServerConfiguration CreateConfiguration(string prompt, string toolName, string arguments)
     {
-        return new LlmTckConfigurationBuilder()
-            .AddModel(FileContextAgentLlmTckTests.Model, LlmTckModelKind.Chat)
+        return new LlmTestServerConfigurationBuilder()
+            .AddModel(FileContextAgentLlmTestServerTests.Model, LlmTestServerModelKind.Chat)
             .AddChatScenario($"mutation-{toolName}", scenario => scenario
-                .ForModel(FileContextAgentLlmTckTests.Model)
+                .ForModel(FileContextAgentLlmTestServerTests.Model)
                 .WhenUserContains(prompt)
-                .Responds(LlmTckToolReplay.CreateResponse($"call-{toolName}", toolName, arguments))
+                .Responds(LlmTestServerToolReplay.CreateResponse($"call-{toolName}", toolName, arguments))
                 .Responds(ExpectedAgentResponse))
             .Build();
     }

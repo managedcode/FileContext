@@ -17,10 +17,10 @@
     <PackageVersion Include="coverlet.collector" Version="10.1.0" />
     <PackageVersion Include="coverlet.msbuild" Version="10.1.0" />
     <PackageVersion Include="DotNet.ReproducibleBuilds" Version="2.0.5" />
-    <PackageVersion Include="ManagedCode.LlmTck" Version="0.1.14" />
-    <PackageVersion Include="ManagedCode.LlmTck.Client" Version="0.1.14" />
-    <PackageVersion Include="ManagedCode.LlmTck.Hosting" Version="0.1.14" />
-    <PackageVersion Include="ManagedCode.LlmTck.OpenAI" Version="0.1.14" />
+    <PackageVersion Include="ManagedCode.LlmTestServer" Version="1.0.0" />
+    <PackageVersion Include="ManagedCode.LlmTestServer.Client" Version="1.0.0" />
+    <PackageVersion Include="ManagedCode.LlmTestServer.Hosting" Version="1.0.0" />
+    <PackageVersion Include="ManagedCode.LlmTestServer.OpenAI" Version="1.0.0" />
     <PackageVersion Include="ManagedCode.MarkdownLd.Kb" Version="0.2.11" />
     <PackageVersion Include="ManagedCode.Storage.Core" Version="10.1.3" />
     <PackageVersion Include="ManagedCode.Storage.FileSystem" Version="10.1.3" />

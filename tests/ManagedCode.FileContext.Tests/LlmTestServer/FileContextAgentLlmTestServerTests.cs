@@ -1,14 +1,14 @@
 using System.ClientModel;
-using ManagedCode.LlmTck.Configuration;
-using ManagedCode.LlmTck.Models;
+using ManagedCode.LlmTestServer.Configuration;
+using ManagedCode.LlmTestServer.Models;
 using ManagedCode.Storage.Core.Models;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using OpenAI;
 
-namespace ManagedCode.FileContext.Tests.LlmTck;
+namespace ManagedCode.FileContext.Tests.LlmTestServer;
 
-public sealed class FileContextAgentLlmTckTests
+public sealed class FileContextAgentLlmTestServerTests
 {
     internal const string Model = "gpt-4.1-mini";
 
@@ -16,13 +16,13 @@ public sealed class FileContextAgentLlmTckTests
     public async Task Agent_reads_docx_through_native_tool_and_receives_bounded_text()
     {
         const string prompt = "Read family.docx.";
-        LlmTckToolReplay.Reset();
-        await using var host = new LlmTckTestHost(() => new LlmTckConfigurationBuilder()
-            .AddModel(Model, LlmTckModelKind.Chat)
+        LlmTestServerToolReplay.Reset();
+        await using var host = new LlmTestServerTestHost(() => new LlmTestServerConfigurationBuilder()
+            .AddModel(Model, LlmTestServerModelKind.Chat)
             .AddChatScenario("docx-tool-loop", scenario => scenario
                 .ForModel(Model)
                 .WhenUserContains(prompt)
-                .Responds(LlmTckToolReplay.CreateResponse("docx-1", FileContextToolNames.DocxText,
+                .Responds(LlmTestServerToolReplay.CreateResponse("docx-1", FileContextToolNames.DocxText,
                     "{\"path\":\"family.docx\",\"paragraphCount\":1}"))
                 .Responds("Document read"))
             .Build());
@@ -35,17 +35,17 @@ public sealed class FileContextAgentLlmTckTests
         var store = new ManagedCodeStorageFileStore(storage.Storage);
         using var provider = new FileContextProvider(store, new FileContextService(store),
             new FileContextOptions { RequireReadToolApproval = false });
-        var sdk = new OpenAIClient(new ApiKeyCredential("not-required-by-llm-tck"),
-            new OpenAIClientOptions { Endpoint = LlmTckToolReplay.CreateRouteUri(host.Endpoint) });
+        var sdk = new OpenAIClient(new ApiKeyCredential("not-required-by-llm-test-server"),
+            new OpenAIClientOptions { Endpoint = LlmTestServerToolReplay.CreateRouteUri(host.Endpoint) });
         using var client = sdk.GetChatClient(Model).AsIChatClient().AsBuilder()
             .UseAIContextProviders(provider).UseFunctionInvocation().Build();
         var agent = new ChatClientAgent(client, new ChatClientAgentOptions { UseProvidedChatClientAsIs = true });
 
         (await agent.RunAsync(prompt)).Text.ShouldBe("Document read");
-        LlmTckToolReplay.RecordedRequests.Count.ShouldBe(2);
-        LlmTckToolReplay.RecordedRequests[0].ShouldContain(FileContextToolNames.DocxText);
-        LlmTckToolReplay.RecordedRequests[1].ShouldContain("Grandmother's family history");
-        LlmTckToolReplay.RecordedRequests[1].ShouldContain("nextParagraph");
+        LlmTestServerToolReplay.RecordedRequests.Count.ShouldBe(2);
+        LlmTestServerToolReplay.RecordedRequests[0].ShouldContain(FileContextToolNames.DocxText);
+        LlmTestServerToolReplay.RecordedRequests[1].ShouldContain("Grandmother's family history");
+        LlmTestServerToolReplay.RecordedRequests[1].ShouldContain("nextParagraph");
         (await host.GetAssertionsAsync()).Matched.ShouldBe(2);
     }
 
@@ -54,13 +54,13 @@ public sealed class FileContextAgentLlmTckTests
     {
         const string prompt = "Read the second line of notes.txt.";
         const string expected = "The second line is storage-grounded.";
-        LlmTckToolReplay.Reset();
-        await using var host = new LlmTckTestHost(() => new LlmTckConfigurationBuilder()
-            .AddModel(Model, LlmTckModelKind.Chat)
+        LlmTestServerToolReplay.Reset();
+        await using var host = new LlmTestServerTestHost(() => new LlmTestServerConfigurationBuilder()
+            .AddModel(Model, LlmTestServerModelKind.Chat)
             .AddChatScenario("file-context-tool-loop", scenario => scenario
                 .ForModel(Model)
                 .WhenUserContains(prompt)
-                .Responds(LlmTckToolReplay.CreateResponse(
+                .Responds(LlmTestServerToolReplay.CreateResponse(
                     "read-range-1",
                     FileAccessProvider.ReadFileToolName,
                     "{\"fileName\":\"notes.txt\"}"))
@@ -75,8 +75,8 @@ public sealed class FileContextAgentLlmTckTests
             new FileContextService(store),
             new FileContextOptions { RequireReadToolApproval = false });
         var sdk = new OpenAIClient(
-            new ApiKeyCredential("not-required-by-llm-tck"),
-            new OpenAIClientOptions { Endpoint = LlmTckToolReplay.CreateRouteUri(host.Endpoint) });
+            new ApiKeyCredential("not-required-by-llm-test-server"),
+            new OpenAIClientOptions { Endpoint = LlmTestServerToolReplay.CreateRouteUri(host.Endpoint) });
         using var chatClient = sdk.GetChatClient(Model)
             .AsIChatClient()
             .AsBuilder()
@@ -91,18 +91,18 @@ public sealed class FileContextAgentLlmTckTests
         await AssertDefaultToolCatalogAsync(host);
     }
 
-    private static async Task AssertDefaultToolCatalogAsync(LlmTckTestHost host)
+    private static async Task AssertDefaultToolCatalogAsync(LlmTestServerTestHost host)
     {
-        LlmTckToolReplay.RecordedRequests.Count.ShouldBe(2);
-        LlmTckToolReplay.RecordedRequests[0].ShouldContain(FileAccessProvider.ReadFileToolName);
-        LlmTckToolReplay.RecordedRequests[0].ShouldContain(FileAccessProvider.LsToolName);
-        LlmTckToolReplay.RecordedRequests[0].ShouldContain(FileAccessProvider.GrepToolName);
-        LlmTckToolReplay.RecordedRequests[0].ShouldContain(FileContextToolNames.ReadRange);
-        LlmTckToolReplay.RecordedRequests[0].ShouldContain(FileContextToolNames.GetInfo);
-        LlmTckToolReplay.RecordedRequests[0].ShouldContain(FileContextToolNames.SearchMarkdownGraph);
-        LlmTckToolReplay.RecordedRequests[0].ShouldContain(FileContextToolNames.ExportMarkdownGraph);
-        LlmTckToolReplay.RecordedRequests[0].ShouldNotContain(FileAccessProvider.WriteToolName);
-        LlmTckToolReplay.RecordedRequests[1].ShouldContain("storage-grounded");
+        LlmTestServerToolReplay.RecordedRequests.Count.ShouldBe(2);
+        LlmTestServerToolReplay.RecordedRequests[0].ShouldContain(FileAccessProvider.ReadFileToolName);
+        LlmTestServerToolReplay.RecordedRequests[0].ShouldContain(FileAccessProvider.LsToolName);
+        LlmTestServerToolReplay.RecordedRequests[0].ShouldContain(FileAccessProvider.GrepToolName);
+        LlmTestServerToolReplay.RecordedRequests[0].ShouldContain(FileContextToolNames.ReadRange);
+        LlmTestServerToolReplay.RecordedRequests[0].ShouldContain(FileContextToolNames.GetInfo);
+        LlmTestServerToolReplay.RecordedRequests[0].ShouldContain(FileContextToolNames.SearchMarkdownGraph);
+        LlmTestServerToolReplay.RecordedRequests[0].ShouldContain(FileContextToolNames.ExportMarkdownGraph);
+        LlmTestServerToolReplay.RecordedRequests[0].ShouldNotContain(FileAccessProvider.WriteToolName);
+        LlmTestServerToolReplay.RecordedRequests[1].ShouldContain("storage-grounded");
         var assertions = await host.GetAssertionsAsync().ConfigureAwait(false);
         assertions.Matched.ShouldBe(2);
         assertions.Unmatched.ShouldBe(0);
@@ -123,13 +123,13 @@ public sealed class FileContextAgentLlmTckTests
     {
         var prompt = $"Invoke {toolName}.";
         const string expected = "The requested file-context tool completed.";
-        LlmTckToolReplay.Reset();
-        await using var host = new LlmTckTestHost(() => new LlmTckConfigurationBuilder()
-            .AddModel(Model, LlmTckModelKind.Chat)
+        LlmTestServerToolReplay.Reset();
+        await using var host = new LlmTestServerTestHost(() => new LlmTestServerConfigurationBuilder()
+            .AddModel(Model, LlmTestServerModelKind.Chat)
             .AddChatScenario($"extended-{toolName}", scenario => scenario
                 .ForModel(Model)
                 .WhenUserContains(prompt)
-                .Responds(LlmTckToolReplay.CreateResponse($"call-{toolName}", toolName, arguments))
+                .Responds(LlmTestServerToolReplay.CreateResponse($"call-{toolName}", toolName, arguments))
                 .Responds(expected))
             .Build());
         await host.StartAsync();
@@ -142,8 +142,8 @@ public sealed class FileContextAgentLlmTckTests
             new FileContextService(store),
             new FileContextOptions { RequireReadToolApproval = false });
         var sdk = new OpenAIClient(
-            new ApiKeyCredential("not-required-by-llm-tck"),
-            new OpenAIClientOptions { Endpoint = LlmTckToolReplay.CreateRouteUri(host.Endpoint) });
+            new ApiKeyCredential("not-required-by-llm-test-server"),
+            new OpenAIClientOptions { Endpoint = LlmTestServerToolReplay.CreateRouteUri(host.Endpoint) });
         using var chatClient = sdk.GetChatClient(Model)
             .AsIChatClient()
             .AsBuilder()
@@ -155,8 +155,8 @@ public sealed class FileContextAgentLlmTckTests
         var response = await agent.RunAsync(prompt);
 
         response.Text.ShouldBe(expected);
-        LlmTckToolReplay.RecordedRequests.Count.ShouldBe(2);
-        LlmTckToolReplay.RecordedRequests[1].ShouldContain(resultMarker, Case.Insensitive);
+        LlmTestServerToolReplay.RecordedRequests.Count.ShouldBe(2);
+        LlmTestServerToolReplay.RecordedRequests[1].ShouldContain(resultMarker, Case.Insensitive);
         var assertions = await host.GetAssertionsAsync();
         assertions.Matched.ShouldBe(2);
         assertions.Unmatched.ShouldBe(0);

@@ -1,12 +1,12 @@
 using System.ClientModel;
 using System.Text.Json;
-using ManagedCode.LlmTck.Configuration;
-using ManagedCode.LlmTck.Models;
+using ManagedCode.LlmTestServer.Configuration;
+using ManagedCode.LlmTestServer.Models;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using OpenAI;
 
-namespace ManagedCode.FileContext.Tests.LlmTck;
+namespace ManagedCode.FileContext.Tests.LlmTestServer;
 
 public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHelper output)
 {
@@ -23,11 +23,11 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
     [InlineData(FileContextToolNames.SearchMarkdownGraph, "{\"query\":\"absent\"}", "Error: Function failed.")]
     public async Task EmptyOrFailedTool_StillSendsMatchingResult(string toolName, string arguments, string expectedContent)
     {
-        var requests = await RunToolLoopAsync(LlmTckToolReplay.CreateResponse("call-empty", toolName, arguments));
+        var requests = await RunToolLoopAsync(LlmTestServerToolReplay.CreateResponse("call-empty", toolName, arguments));
 
         foreach (var request in requests)
         {
-            var results = LlmTckToolAssertions.AssertClosedCalls(request, "call-empty");
+            var results = LlmTestServerToolAssertions.AssertClosedCalls(request, "call-empty");
             output.WriteLine(results[0].GetRawText());
             results[0].GetProperty("content").ValueKind.ShouldBe(JsonValueKind.String);
             results[0].GetProperty("content").GetString()!.ShouldContain(expectedContent);
@@ -39,12 +39,12 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
     [InlineData("first.txt", "found", true)]
     public async Task MetadataLookup_PreservesStructuredResultAfterSessionRestore(string path, string status, bool exists)
     {
-        var requests = await RunToolLoopAsync(LlmTckToolReplay.CreateResponse(
+        var requests = await RunToolLoopAsync(LlmTestServerToolReplay.CreateResponse(
             "metadata", FileContextToolNames.GetInfo, JsonSerializer.Serialize(new { path })));
 
         foreach (var request in requests)
         {
-            var results = LlmTckToolAssertions.AssertClosedCalls(request, "metadata");
+            var results = LlmTestServerToolAssertions.AssertClosedCalls(request, "metadata");
             using var content = JsonDocument.Parse(results[0].GetProperty("content").GetString()!);
             content.RootElement.GetProperty("status").GetString().ShouldBe(status);
             content.RootElement.GetProperty("path").GetString().ShouldBe(path);
@@ -60,7 +60,7 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
     [Fact]
     public async Task ReadingGuidance_ReachesModelAndRestoredSession()
     {
-        var requests = await RunToolLoopAsync(LlmTckToolReplay.CreateResponse(
+        var requests = await RunToolLoopAsync(LlmTestServerToolReplay.CreateResponse(
             "metadata", FileContextToolNames.GetInfo, "{\"path\":\"first.txt\"}"));
 
         foreach (var request in requests)
@@ -82,15 +82,15 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
     [InlineData(true)]
     public async Task MultipleFileCalls_InOneTurn_ReturnEveryResult(bool concurrent)
     {
-        var first = LlmTckToolReplay.CreateResponse("call-first", FileAccessProvider.ReadFileToolName, "{\"fileName\":\"first.txt\"}");
-        var second = LlmTckToolReplay.CreateResponse("call-second", FileContextToolNames.ReadRange, "{\"path\":\"second.txt\"}");
-        var missing = LlmTckToolReplay.CreateResponse("call-missing", FileContextToolNames.ReadRange, "{\"path\":\"missing.txt\"}");
+        var first = LlmTestServerToolReplay.CreateResponse("call-first", FileAccessProvider.ReadFileToolName, "{\"fileName\":\"first.txt\"}");
+        var second = LlmTestServerToolReplay.CreateResponse("call-second", FileContextToolNames.ReadRange, "{\"path\":\"second.txt\"}");
+        var missing = LlmTestServerToolReplay.CreateResponse("call-missing", FileContextToolNames.ReadRange, "{\"path\":\"missing.txt\"}");
 
         var requests = await RunToolLoopAsync($"[{first},{second},{missing}]", concurrent);
 
         foreach (var request in requests)
         {
-            var results = LlmTckToolAssertions.AssertClosedCalls(request, "call-first", "call-second", "call-missing");
+            var results = LlmTestServerToolAssertions.AssertClosedCalls(request, "call-first", "call-second", "call-missing");
             results.Single(result => string.Equals(result.GetProperty("tool_call_id").GetString(), "call-first", StringComparison.Ordinal))
                 .GetProperty("content").GetString()!.ShouldContain("first-content");
             results.Single(result => string.Equals(result.GetProperty("tool_call_id").GetString(), "call-second", StringComparison.Ordinal))
@@ -104,12 +104,12 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
     public async Task LiteralNullAssistantText_IsNotInterpretedAsToolReplay()
     {
         var requests = await RunToolLoopAsync(
-            LlmTckToolReplay.CreateResponse("read", FileAccessProvider.ReadFileToolName, "{\"fileName\":\"first.txt\"}"),
+            LlmTestServerToolReplay.CreateResponse("read", FileAccessProvider.ReadFileToolName, "{\"fileName\":\"first.txt\"}"),
             finalResponse: "null");
 
         foreach (var request in requests)
         {
-            LlmTckToolAssertions.AssertClosedCalls(request, "read");
+            LlmTestServerToolAssertions.AssertClosedCalls(request, "read");
         }
     }
 
@@ -117,12 +117,12 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
     public async Task OperationTimeout_ReturnsToolErrorAndSurvivesSessionRestore()
     {
         var requests = await RunToolLoopAsync(
-            LlmTckToolReplay.CreateResponse("timeout", FileContextToolNames.ReadRange, "{\"path\":\"slow.txt\",\"startLine\":2}"),
+            LlmTestServerToolReplay.CreateResponse("timeout", FileContextToolNames.ReadRange, "{\"path\":\"slow.txt\",\"startLine\":2}"),
             operationTimeout: TimeSpan.FromMilliseconds(1));
 
         foreach (var request in requests)
         {
-            var results = LlmTckToolAssertions.AssertClosedCalls(request, "timeout");
+            var results = LlmTestServerToolAssertions.AssertClosedCalls(request, "timeout");
             results[0].GetProperty("content").GetString()!.ShouldContain("Error: Function failed.");
         }
     }
@@ -130,10 +130,10 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
     private static async Task<string[]> RunToolLoopAsync(string replay, bool concurrent = false, string finalResponse = "Inspection completed.", TimeSpan? operationTimeout = null)
     {
         const string prompt = "Inspect the files.";
-        LlmTckToolReplay.Reset();
-        var host = new LlmTckTestHost(() => new LlmTckConfigurationBuilder()
-            .AddModel(FileContextAgentLlmTckTests.Model, LlmTckModelKind.Chat)
-            .AddChatScenario("protocol", scenario => scenario.ForModel(FileContextAgentLlmTckTests.Model)
+        LlmTestServerToolReplay.Reset();
+        var host = new LlmTestServerTestHost(() => new LlmTestServerConfigurationBuilder()
+            .AddModel(FileContextAgentLlmTestServerTests.Model, LlmTestServerModelKind.Chat)
+            .AddChatScenario("protocol", scenario => scenario.ForModel(FileContextAgentLlmTestServerTests.Model)
                 .WhenUserContains(prompt).Responds(replay).Responds(finalResponse).Responds("Follow-up completed."))
             .Build());
         await using var hostLifetime = host.ConfigureAwait(false);
@@ -151,19 +151,19 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
         var options = new FileContextOptions { RequireReadToolApproval = false, OperationTimeout = operationTimeout };
         store = new ManagedCodeStorageFileStore(storage.Storage, options);
         using var provider = new FileContextProvider(store, new FileContextService(store, options), options);
-        var sdk = new OpenAIClient(new ApiKeyCredential("not-required-by-llm-tck"),
-            new OpenAIClientOptions { Endpoint = LlmTckToolReplay.CreateRouteUri(host.Endpoint) });
-        using var client = sdk.GetChatClient(FileContextAgentLlmTckTests.Model).AsIChatClient().AsBuilder()
+        var sdk = new OpenAIClient(new ApiKeyCredential("not-required-by-llm-test-server"),
+            new OpenAIClientOptions { Endpoint = LlmTestServerToolReplay.CreateRouteUri(host.Endpoint) });
+        using var client = sdk.GetChatClient(FileContextAgentLlmTestServerTests.Model).AsIChatClient().AsBuilder()
             .UseAIContextProviders(provider)
             .UseFunctionInvocation(configure: options => options.AllowConcurrentInvocation = concurrent).Build();
         var agent = new ChatClientAgent(client, new ChatClientAgentOptions { UseProvidedChatClientAsIs = true });
 
         await RunSessionRoundTripAsync(agent, prompt, finalResponse).ConfigureAwait(false);
-        LlmTckToolReplay.RecordedRequests.Count.ShouldBe(3);
+        LlmTestServerToolReplay.RecordedRequests.Count.ShouldBe(3);
         var assertions = await host.GetAssertionsAsync().ConfigureAwait(false);
         assertions.Matched.ShouldBe(3);
         assertions.Unmatched.ShouldBe(0);
-        return LlmTckToolReplay.RecordedRequests.Skip(1).ToArray();
+        return LlmTestServerToolReplay.RecordedRequests.Skip(1).ToArray();
     }
 
     private static async Task RunSessionRoundTripAsync(ChatClientAgent agent, string prompt, string finalResponse)

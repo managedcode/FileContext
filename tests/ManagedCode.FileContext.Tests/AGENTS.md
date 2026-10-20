@@ -8,11 +8,11 @@ Prove storage-adapter, tool, DI, graph, safety, and end-to-end Agent Framework b
 
 - storage adapter tests use `ManagedCode.Storage.FileSystem` against a temporary directory
 - graph tests use real Markdown-LD builds
-- agent tests use an in-process HTTP LlmTck host and real function invocation
+- agent tests use an in-process HTTP LlmTestServer host and real function invocation
 
 ## Boundaries
 
-- Do not mock `IStorage`, Agent Framework, or LlmTck.
+- Do not mock `IStorage`, Agent Framework, or LlmTestServer.
 - Assert concrete files, content, search matches, graph results, and invoked tool output.
 - Keep all temporary data under unique test-owned directories and remove it on disposal.
 
@@ -27,4 +27,4 @@ Prove storage-adapter, tool, DI, graph, safety, and end-to-end Agent Framework b
 
 ## Risks
 
-LlmTck HTTP tests allocate an ephemeral loopback port. They must dispose the host and must not rely on fixed ports or arbitrary sleeps.
+LlmTestServer HTTP tests allocate an ephemeral loopback port. They must dispose the host and must not rely on fixed ports or arbitrary sleeps.

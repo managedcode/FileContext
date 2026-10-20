@@ -1,14 +1,14 @@
 using System.ClientModel;
 using System.Text.Json;
-using ManagedCode.LlmTck.Configuration;
-using ManagedCode.LlmTck.Models;
+using ManagedCode.LlmTestServer.Configuration;
+using ManagedCode.LlmTestServer.Models;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using OpenAI;
 
-namespace ManagedCode.FileContext.Tests.LlmTck;
+namespace ManagedCode.FileContext.Tests.LlmTestServer;
 
-public sealed class FileDocumentCreationLlmTckTests
+public sealed class FileDocumentCreationLlmTestServerTests
 {
     private const string Response = "Created the requested document.";
 
@@ -26,21 +26,21 @@ public sealed class FileDocumentCreationLlmTckTests
         options.EnableWriteTools = false;
         var arguments = JsonSerializer.Serialize(new { path = workbook.Path, sheet = "Products", startRow = 1, rowCount = 1, startColumn = 1, columnCount = 3 });
         var prompt = $"Read with {toolName}.";
-        LlmTckToolReplay.Reset();
-        await using var host = new LlmTckTestHost(() => new LlmTckConfigurationBuilder()
-            .AddModel(FileContextAgentLlmTckTests.Model, LlmTckModelKind.Chat)
-            .AddChatScenario($"read-{toolName}", scenario => scenario.ForModel(FileContextAgentLlmTckTests.Model)
-                .WhenUserContains(prompt).Responds(LlmTckToolReplay.CreateResponse("native-read", toolName, arguments))
+        LlmTestServerToolReplay.Reset();
+        await using var host = new LlmTestServerTestHost(() => new LlmTestServerConfigurationBuilder()
+            .AddModel(FileContextAgentLlmTestServerTests.Model, LlmTestServerModelKind.Chat)
+            .AddChatScenario($"read-{toolName}", scenario => scenario.ForModel(FileContextAgentLlmTestServerTests.Model)
+                .WhenUserContains(prompt).Responds(LlmTestServerToolReplay.CreateResponse("native-read", toolName, arguments))
                 .Responds("Workbook read.")).Build());
         await host.StartAsync();
         using var provider = new FileContextProvider(store, context, options);
-        var sdk = new OpenAIClient(new ApiKeyCredential("not-required-by-llm-tck"),
-            new OpenAIClientOptions { Endpoint = LlmTckToolReplay.CreateRouteUri(host.Endpoint) });
-        using var client = sdk.GetChatClient(FileContextAgentLlmTckTests.Model).AsIChatClient().AsBuilder()
+        var sdk = new OpenAIClient(new ApiKeyCredential("not-required-by-llm-test-server"),
+            new OpenAIClientOptions { Endpoint = LlmTestServerToolReplay.CreateRouteUri(host.Endpoint) });
+        using var client = sdk.GetChatClient(FileContextAgentLlmTestServerTests.Model).AsIChatClient().AsBuilder()
             .UseAIContextProviders(provider).UseFunctionInvocation().Build();
         var agent = new ChatClientAgent(client, new ChatClientAgentOptions { UseProvidedChatClientAsIs = true });
         (await agent.RunAsync(prompt)).Text.ShouldBe("Workbook read.");
-        var results = LlmTckToolAssertions.AssertClosedCalls(LlmTckToolReplay.RecordedRequests[1], "native-read");
+        var results = LlmTestServerToolAssertions.AssertClosedCalls(LlmTestServerToolReplay.RecordedRequests[1], "native-read");
         var content = results[0].GetProperty("content").GetString()!;
         content.ShouldContain("Products");
         if (string.Equals(toolName, FileContextToolNames.WorkbookRange, StringComparison.Ordinal))
@@ -49,7 +49,7 @@ public sealed class FileDocumentCreationLlmTckTests
             content.ShouldContain("C1");
             content.ShouldContain("FT0008");
         }
-        LlmTckToolReplay.RecordedRequests[0].ShouldNotContain(FileContextToolNames.CreateWorkbook);
+        LlmTestServerToolReplay.RecordedRequests[0].ShouldNotContain(FileContextToolNames.CreateWorkbook);
     }
 
     [Theory]
@@ -59,11 +59,11 @@ public sealed class FileDocumentCreationLlmTckTests
     public async Task Agent_creates_a_real_document_and_receives_a_closed_tool_result(string toolName, string arguments, string mediaPrefix)
     {
         var prompt = $"Create with {toolName}.";
-        LlmTckToolReplay.Reset();
-        await using var host = new LlmTckTestHost(() => new LlmTckConfigurationBuilder()
-            .AddModel(FileContextAgentLlmTckTests.Model, LlmTckModelKind.Chat)
-            .AddChatScenario($"document-{toolName}", scenario => scenario.ForModel(FileContextAgentLlmTckTests.Model)
-                .WhenUserContains(prompt).Responds(LlmTckToolReplay.CreateResponse($"call-{toolName}", toolName, arguments))
+        LlmTestServerToolReplay.Reset();
+        await using var host = new LlmTestServerTestHost(() => new LlmTestServerConfigurationBuilder()
+            .AddModel(FileContextAgentLlmTestServerTests.Model, LlmTestServerModelKind.Chat)
+            .AddChatScenario($"document-{toolName}", scenario => scenario.ForModel(FileContextAgentLlmTestServerTests.Model)
+                .WhenUserContains(prompt).Responds(LlmTestServerToolReplay.CreateResponse($"call-{toolName}", toolName, arguments))
                 .Responds(Response)).Build());
         await host.StartAsync();
         await using var storage = await TestStorageScope.CreateAsync();
@@ -71,13 +71,13 @@ public sealed class FileDocumentCreationLlmTckTests
         var store = new ManagedCodeStorageFileStore(storage.Storage, options);
         var context = new FileContextService(store, options);
         using var provider = new FileContextProvider(store, context, options);
-        var sdk = new OpenAIClient(new ApiKeyCredential("not-required-by-llm-tck"),
-            new OpenAIClientOptions { Endpoint = LlmTckToolReplay.CreateRouteUri(host.Endpoint) });
-        using var client = sdk.GetChatClient(FileContextAgentLlmTckTests.Model).AsIChatClient().AsBuilder()
+        var sdk = new OpenAIClient(new ApiKeyCredential("not-required-by-llm-test-server"),
+            new OpenAIClientOptions { Endpoint = LlmTestServerToolReplay.CreateRouteUri(host.Endpoint) });
+        using var client = sdk.GetChatClient(FileContextAgentLlmTestServerTests.Model).AsIChatClient().AsBuilder()
             .UseAIContextProviders(provider).UseFunctionInvocation().Build();
         var agent = new ChatClientAgent(client, new ChatClientAgentOptions { UseProvidedChatClientAsIs = true });
         (await agent.RunAsync(prompt)).Text.ShouldBe(Response);
-        var results = LlmTckToolAssertions.AssertClosedCalls(LlmTckToolReplay.RecordedRequests[1], $"call-{toolName}");
+        var results = LlmTestServerToolAssertions.AssertClosedCalls(LlmTestServerToolReplay.RecordedRequests[1], $"call-{toolName}");
         var created = JsonSerializer.Deserialize<FileContextCreatedFile>(results[0].GetProperty("content").GetString()!, JsonSerializerOptions.Web)!;
         created.MediaType.ShouldStartWith(mediaPrefix);
         (await context.GetInfoAsync(created.Path))!.Length.ShouldBe((ulong)created.Length);

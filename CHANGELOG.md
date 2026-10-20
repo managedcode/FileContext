@@ -2,6 +2,10 @@
 
 All notable changes to ManagedCode.FileContext are documented here.
 
+## 1.0.17
+
+- Update deterministic agent integration dependencies and APIs to `ManagedCode.LlmTestServer` 1.0.0.
+
 ## 1.0.16
 
 - Add optional workbook header styling, Excel number formats, column widths and frozen headers.

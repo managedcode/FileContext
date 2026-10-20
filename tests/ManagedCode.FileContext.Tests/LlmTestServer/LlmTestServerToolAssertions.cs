@@ -1,8 +1,8 @@
 using System.Text.Json;
 
-namespace ManagedCode.FileContext.Tests.LlmTck;
+namespace ManagedCode.FileContext.Tests.LlmTestServer;
 
-internal static class LlmTckToolAssertions
+internal static class LlmTestServerToolAssertions
 {
     public static JsonElement[] AssertClosedCalls(string request, params string[] expectedCallIds)
     {
