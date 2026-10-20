@@ -12,34 +12,84 @@ internal static class FileContextWorkbookWriter
     private const int MaximumColumns = 16_384;
     private const int MaximumCellTextLength = 32_767;
 
-    public static byte[] Create(FileContextWorkbook workbook, CancellationToken cancellationToken)
+    public static byte[] Create(FileContextWorkbook workbook, byte[]? template, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(workbook);
         if (workbook.Sheets is null) { throw new ArgumentException("Workbook sheets are required.", nameof(workbook)); }
         if (workbook.Sheets.Count == 0) { throw new ArgumentException("A workbook needs at least one sheet.", nameof(workbook)); }
         using var stream = new MemoryStream();
-        using (var document = SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook))
+        if (template is not null) { stream.Write(template); stream.Position = 0; }
+        using (var document = template is null ? SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook) : SpreadsheetDocument.Open(stream, true))
         {
-            var part = document.AddWorkbookPart();
-            part.Workbook = new Workbook { Sheets = new Sheets() };
+            if (document.DocumentType != SpreadsheetDocumentType.Workbook)
+            { throw new ArgumentException("Template must be a macro-free XLSX workbook.", nameof(template)); }
+            var part = document.WorkbookPart ?? document.AddWorkbookPart();
+            part.Workbook ??= new Workbook { Sheets = new Sheets() };
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var styles = new FileContextWorkbookStyles(part);
             foreach (var sheet in workbook.Sheets)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 ValidateSheet(sheet, names);
-                var worksheet = part.AddNewPart<WorksheetPart>();
-                worksheet.Worksheet = new Worksheet();
-                worksheet.Worksheet.AppendChild(CreateRows(sheet.Rows, cancellationToken));
-                part.Workbook.GetFirstChild<Sheets>()!.AppendChild(new Sheet
-                {
-                    Id = part.GetIdOfPart(worksheet),
-                    SheetId = (uint)names.Count,
-                    Name = sheet.Name
-                });
+                WriteSheet(part, sheet, styles, cancellationToken);
             }
             part.Workbook.Save();
         }
         return stream.ToArray();
+    }
+
+    private static void WriteSheet(WorkbookPart part, FileContextWorksheet sheet, FileContextWorkbookStyles styles, CancellationToken token)
+    {
+        if (sheet.Style is { } requestedStyle &&
+            (requestedStyle.NumberFormats is null || requestedStyle.ColumnWidths is null))
+        { throw new ArgumentException("Style numberFormats and columnWidths must be objects.", nameof(sheet)); }
+        var sheets = part.Workbook!.GetFirstChild<Sheets>() ?? part.Workbook.AppendChild(new Sheets());
+        var existing = sheets.Elements<Sheet>().FirstOrDefault(item => string.Equals(item.Name, sheet.Name, StringComparison.OrdinalIgnoreCase));
+        var worksheet = existing is null ? part.AddNewPart<WorksheetPart>() : (WorksheetPart)part.GetPartById(existing.Id!);
+        worksheet.Worksheet ??= new Worksheet();
+        var prior = worksheet.Worksheet.GetFirstChild<SheetData>();
+        var data = CreateRows(sheet.Rows, sheet.Style, styles, token);
+        if (prior is null) { worksheet.Worksheet.AppendChild(data); }
+        else
+        {
+            InheritStyles(data, prior);
+            worksheet.Worksheet.ReplaceChild(data, prior);
+        }
+        if (sheet.Style is { } style) { FileContextWorkbookStyles.Layout(worksheet.Worksheet, style); }
+        if (existing is null)
+        {
+            var nextId = sheets.Elements<Sheet>().Select(item => item.SheetId!.Value).DefaultIfEmpty(0U).Max() + 1;
+            sheets.AppendChild(new Sheet { Id = part.GetIdOfPart(worksheet), SheetId = nextId, Name = sheet.Name });
+        }
+        worksheet.Worksheet.Save();
+    }
+
+    private static void InheritStyles(SheetData data, SheetData prior)
+    {
+        var inherited = new Dictionary<(uint Row, int Column), uint>();
+        uint rowNumber = 0;
+        foreach (var row in prior.Elements<Row>())
+        {
+            rowNumber = row.RowIndex?.Value ?? rowNumber + 1;
+            var column = 0;
+            foreach (var cell in row.Elements<Cell>())
+            {
+                column = cell.CellReference is null ? column + 1 : FileContextWorkbookReader.ReadColumn(cell.CellReference.Value!);
+                if (cell.StyleIndex is { } style) { inherited[(rowNumber, column)] = style.Value; }
+            }
+        }
+        rowNumber = 0;
+        foreach (var row in data.Elements<Row>())
+        {
+            rowNumber++;
+            var column = 0;
+            foreach (var cell in row.Elements<Cell>())
+            {
+                column++;
+                if (cell.StyleIndex is null && inherited.TryGetValue((rowNumber, column), out var style))
+                { cell.StyleIndex = style; }
+            }
+        }
     }
 
     private static void ValidateSheet(FileContextWorksheet sheet, HashSet<string> names)
@@ -55,15 +105,25 @@ internal static class FileContextWorkbookWriter
         if (sheet.Rows.Count > MaximumRows) { throw new ArgumentException("A sheet exceeds Excel's row limit.", nameof(sheet)); }
     }
 
-    private static SheetData CreateRows(IReadOnlyList<IReadOnlyList<FileContextSpreadsheetCell>> rows, CancellationToken token)
+    private static SheetData CreateRows(IReadOnlyList<IReadOnlyList<FileContextSpreadsheetCell>> rows, FileContextWorksheetStyle? style, FileContextWorkbookStyles styles, CancellationToken token)
     {
         var data = new SheetData();
+        var rowIndex = 0;
         foreach (var values in rows)
         {
             token.ThrowIfCancellationRequested();
             if (values is null) { throw new ArgumentException("A row must contain a cell list.", nameof(rows)); }
             if (values.Count > MaximumColumns) { throw new ArgumentException("A row exceeds Excel's column limit.", nameof(rows)); }
-            data.AppendChild(new Row(values.Select(CreateCell)));
+            var row = new Row();
+            for (var column = 0; column < values.Count; column++)
+            {
+                var cell = CreateCell(values[column]);
+                if (style is not null && styles.Style(style, rowIndex, column + 1) is var index && index != 0)
+                { cell.StyleIndex = index; }
+                row.AppendChild(cell);
+            }
+            data.AppendChild(row);
+            rowIndex++;
         }
         return data;
     }

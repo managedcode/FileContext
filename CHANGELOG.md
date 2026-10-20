@@ -2,6 +2,12 @@
 
 All notable changes to ManagedCode.FileContext are documented here.
 
+## 1.0.16
+
+- Add optional workbook header styling, Excel number formats, column widths and frozen headers.
+- Support scoped macro-free XLSX templates while retaining styles, layout and untouched sheets.
+- Validate workbook style fields against the Excel format and preserve formula/value semantics.
+
 ## 1.0.14
 
 - Stage seekable cloud PDF streams asynchronously to bounded temporary files before synchronous parser reads and seeks.

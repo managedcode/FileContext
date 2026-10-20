@@ -129,3 +129,26 @@ document into one model call. The tool does not execute macros, fetch external l
 OCR on embedded images. Generic text reads refuse DOCX, and text search skips it.
 
 `file_context_pdf_text` reports a bounded text-layer prefix, total page count, and one-based pages with almost no text. It performs no OCR. `file_context_pdf_page_image` renders a complete page as PNG. `file_context_pdf_images_info` counts embedded image objects, and `file_context_pdf_image` returns one object as PNG. The direct `IFileContextPdf` methods and public byte-oriented PDF APIs support the same operations. Storage-scoped PDF reads enforce a byte cap; page rendering enforces pixel and image-byte caps. Image tools return `DataContent`; host chat pipelines must forward it as image content rather than stringify a function result.
+
+## Workbook styling and templates
+
+`FileContextWorkbook` accepts an optional `TemplatePath` for an existing macro-free
+`.xlsx` in the same authorized storage scope. Each supplied sheet replaces that
+sheet's cell values/formulas, inherits existing cell styles by Excel coordinates,
+and keeps its layout and other package parts; sheets not supplied are retained.
+The template is never modified. A new unique output file is created.
+
+Each worksheet has an optional `Style` object: `BoldHeader`, `HeaderFill` (`#RRGGBB`),
+`FreezeHeader`, `NumberFormats` and `ColumnWidths`. Dictionary keys are one-based
+Excel column numbers. Formats are Excel codes such as `$#,##0.00`, `0.0%`, and
+`yyyy-mm-dd`; date values use Excel serial numbers. Widths use Excel character
+units (positive, maximum 255). These are XLSX format contracts, not app limits.
+Formulas remain explicit and are calculated by Excel. New data starts at A1.
+
+```mermaid
+flowchart LR
+    Scope[Authorized FileContext] --> Template[Optional XLSX template]
+    Template --> Writer[OOXML writer and styles]
+    Input[Typed sheets and values] --> Writer
+    Writer --> New[New scoped workbook]
+```

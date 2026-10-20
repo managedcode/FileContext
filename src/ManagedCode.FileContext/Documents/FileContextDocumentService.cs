@@ -15,9 +15,23 @@ public sealed partial class FileContextDocumentService(ManagedCodeStorageFileSto
         CreateAsync(RequireExtension(fileName, ".csv"), "text/csv; charset=utf-8",
             token => FileContextCsvWriter.Create(document, token), cancellationToken);
 
-    public Task<FileContextCreatedFile> CreateWorkbookAsync(string fileName, FileContextWorkbook workbook, CancellationToken cancellationToken = default) =>
-        CreateAsync(RequireExtension(fileName, ".xlsx"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            token => FileContextWorkbookWriter.Create(workbook, token), cancellationToken);
+    public async Task<FileContextCreatedFile> CreateWorkbookAsync(string fileName, FileContextWorkbook workbook, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(workbook);
+        options.Validate();
+        if (!options.EnableWriteTools) { throw new InvalidOperationException("Document creation requires EnableWriteTools."); }
+        byte[]? template = null;
+        if (workbook.TemplatePath is { } path)
+        {
+            RequireExtension(path, ".xlsx");
+            using var source = await store.OpenReadAsync(path, cancellationToken).ConfigureAwait(false);
+            using var buffer = new MemoryStream();
+            await source.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
+            template = buffer.ToArray();
+        }
+        return await CreateAsync(RequireExtension(fileName, ".xlsx"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            token => FileContextWorkbookWriter.Create(workbook, template, token), cancellationToken).ConfigureAwait(false);
+    }
 
     public Task<FileContextCreatedFile> CreatePdfAsync(string fileName, FileContextPdfDocument document, CancellationToken cancellationToken = default) =>
         CreateAsync(RequireExtension(fileName, ".pdf"), "application/pdf",
