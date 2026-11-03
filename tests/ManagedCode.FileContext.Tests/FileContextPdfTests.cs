@@ -87,9 +87,13 @@ public sealed class FileContextPdfTests
     public void Page_image_enforces_page_scale_and_input_limits()
     {
         var pdf = FileContextPdfTestPdfs.ScannedPages(1);
-        Should.Throw<ArgumentOutOfRangeException>(() => FileContextPdfImages.RenderPagePng(pdf, 1, scale: 0.1));
-        Should.Throw<IOException>(() => FileContextPdfImages.RenderPagePng(pdf, 1, scale: 3));
-        Should.Throw<IOException>(() => FileContextPdfImages.RenderPagePng(new byte[FileContextPdfImages.MaximumPdfBytes + 1], 1));
+        var options = new FileContextOptions { MinimumPdfPageScale = 0.5, MaximumRenderedPagePixels = 4_000_000 };
+        Should.Throw<ArgumentOutOfRangeException>(() => FileContextPdfImages.RenderPagePng(pdf, 1, options, scale: 0.1));
+        Should.Throw<IOException>(() => FileContextPdfImages.RenderPagePng(pdf, 1, options, scale: 3));
+        options.MaximumPdfReadBytes = pdf.Length - 1;
+        Should.Throw<IOException>(() => FileContextPdfImages.RenderPagePng(pdf, 1, options));
+        FileContextPdfImages.RenderPagePng(pdf, 1, scale: 0.1).ShouldNotBeEmpty();
+        Should.Throw<IOException>(() => FileContextPdfImages.RenderPagePng(pdf, 1, scale: float.MaxValue));
         Should.Throw<ArgumentOutOfRangeException>(() => FileContextPdfImages.ExtractPageImagesPng(pdf, 2));
     }
 
@@ -160,8 +164,10 @@ public sealed class FileContextPdfTests
     [Fact]
     public void Embedded_image_count_is_bounded()
     {
-        var pdf = FileContextPdfTestPdfs.WithEmbeddedImages(FileContextPdfImages.MaximumImagesPerPage + 1);
-        Should.Throw<IOException>(() => FileContextPdfImages.ExtractPageImagesPng(pdf, 1));
+        var pdf = FileContextPdfTestPdfs.WithEmbeddedImages(21);
+        var options = new FileContextOptions { MaximumImagesPerPdfPage = 20 };
+        Should.Throw<IOException>(() => FileContextPdfImages.ExtractPageImagesPng(pdf, 1, options));
+        FileContextPdfImages.ExtractPageImagesPng(pdf, 1).Count.ShouldBe(21);
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using ManagedCode.FileContext.Pdf;
 
 namespace ManagedCode.FileContext;
@@ -7,6 +8,7 @@ public sealed class FileContextOptions
 {
     public const string SectionName = "FileContext";
 
+    private const int SurrogatePairLength = 2;
     private static readonly TimeSpan MaximumOperationTimeout = TimeSpan.FromMilliseconds(uint.MaxValue - 1L);
     private static readonly TimeSpan MaximumRegexTimeout = TimeSpan.FromMilliseconds(int.MaxValue - 1);
 
@@ -28,6 +30,8 @@ public sealed class FileContextOptions
     public bool RequireWriteToolApproval { get; set; } = true;
 
     public int MaximumPdfReadBytes { get; set; } = FileContextDefaults.MaximumPdfReadBytes;
+
+    internal long PdfSourceReadBudget => MaximumPdfReadBytes == int.MaxValue ? long.MaxValue : MaximumPdfReadBytes;
 
     /// <summary>Stages cloud streams before synchronous parsing; Automatic reuses local files and memory.</summary>
     public FileContextPdfSourceStagingMode PdfSourceStagingMode { get; set; } = FileContextPdfSourceStagingMode.Automatic;
@@ -63,7 +67,12 @@ public sealed class FileContextOptions
 
     public int MaximumDocxReadBytes { get; set; } = FileContextDefaults.MaximumDocxReadBytes;
 
-    /// <summary>Maximum decompressed XML characters in one Office document part.</summary>
+    internal long DocxSourceReadBudget => MaximumDocxReadBytes == int.MaxValue ? long.MaxValue : MaximumDocxReadBytes;
+
+    /// <summary>Maximum UTF-16 characters per DOCX response. The default permits the entire requested window.</summary>
+    public int MaximumDocxTextCharacters { get; set; } = FileContextDefaults.MaximumDocxTextCharacters;
+
+    /// <summary>Maximum decompressed XML characters in one Office document part. Zero disables the limit.</summary>
     public long MaximumOpenXmlPartCharacters { get; set; } = FileContextDefaults.MaximumOpenXmlPartCharacters;
 
     public long MaximumFullReadBytes { get; set; } = FileContextDefaults.MaximumFullReadBytes;
@@ -85,8 +94,8 @@ public sealed class FileContextOptions
 
     public int MaximumMatchesPerFile { get; set; } = FileContextDefaults.MaximumMatchesPerFile;
 
-    /// <summary>Gets or sets the finite timeout for one regex match against one line, not the entire search.</summary>
-    public TimeSpan RegexTimeout { get; set; } = TimeSpan.FromSeconds(FileContextDefaults.RegexTimeoutSeconds);
+    /// <summary>Gets or sets the timeout for one regex match against one line. The default is infinite.</summary>
+    public TimeSpan RegexTimeout { get; set; } = Regex.InfiniteMatchTimeout;
 
     public string MarkdownGlob { get; set; } = FileContextDefaults.MarkdownGlob;
 
@@ -103,6 +112,48 @@ public sealed class FileContextOptions
         ValidatePositive(MaximumGeneratedFileBytes, nameof(MaximumGeneratedFileBytes));
         ValidatePositive(MaximumReportInputBytes, nameof(MaximumReportInputBytes));
         ValidatePositive(MaximumReportPages, nameof(MaximumReportPages));
+        ValidatePdfOptions();
+        ValidatePositive(MaximumDocxReadBytes, nameof(MaximumDocxReadBytes));
+        if (MaximumDocxTextCharacters < SurrogatePairLength)
+        {
+            throw new InvalidOperationException("MaximumDocxTextCharacters must fit a complete Unicode surrogate pair.");
+        }
+        if (MaximumOpenXmlPartCharacters < 0)
+        {
+            throw new InvalidOperationException("MaximumOpenXmlPartCharacters must be nonnegative.");
+        }
+        ValidatePositive(MaximumFullReadBytes, nameof(MaximumFullReadBytes));
+        ValidatePositive(MaximumRangeReadBytes, nameof(MaximumRangeReadBytes));
+        ValidatePositive(DefaultRangeLineCount, nameof(DefaultRangeLineCount));
+        ValidatePositive(MaximumRangeLineCount, nameof(MaximumRangeLineCount));
+        ValidatePositive(MaximumSearchFiles, nameof(MaximumSearchFiles));
+        ValidatePositive(MaximumDirectoryEntries, nameof(MaximumDirectoryEntries));
+        ValidatePositive(MaximumSearchFileBytes, nameof(MaximumSearchFileBytes));
+        ValidatePositive(MaximumSearchResults, nameof(MaximumSearchResults));
+        ValidatePositive(MaximumMatchesPerFile, nameof(MaximumMatchesPerFile));
+        ValidatePositive(MaximumMarkdownFiles, nameof(MaximumMarkdownFiles));
+        ValidatePositive(MaximumMarkdownSourceBytes, nameof(MaximumMarkdownSourceBytes));
+        ValidatePositive(MaximumGraphResults, nameof(MaximumGraphResults));
+        ValidatePositive(MaximumGraphExportCharacters, nameof(MaximumGraphExportCharacters));
+
+        if (DefaultRangeLineCount != int.MaxValue && DefaultRangeLineCount > MaximumRangeLineCount)
+        {
+            throw new InvalidOperationException("The default range cannot exceed the maximum range.");
+        }
+
+        if (OperationTimeout is { } timeout && (timeout <= TimeSpan.Zero || timeout > MaximumOperationTimeout))
+        {
+            throw new InvalidOperationException($"OperationTimeout must be positive and no greater than {MaximumOperationTimeout}, or null to disable it.");
+        }
+
+        if (RegexTimeout != Regex.InfiniteMatchTimeout && (RegexTimeout <= TimeSpan.Zero || RegexTimeout > MaximumRegexTimeout))
+        {
+            throw new InvalidOperationException("RegexTimeout must be positive and within the supported .NET regex timeout range.");
+        }
+    }
+
+    private void ValidatePdfOptions()
+    {
         ValidatePositive(MaximumPdfReadBytes, nameof(MaximumPdfReadBytes));
         ValidatePositive(PdfSourceBufferBytes, nameof(PdfSourceBufferBytes));
         if (PdfSourceStagingMode is not FileContextPdfSourceStagingMode.Automatic
@@ -128,36 +179,6 @@ public sealed class FileContextOptions
         if (PdfPngQuality is < 0 or > FileContextDefaults.MaximumPdfPngQuality)
         {
             throw new InvalidOperationException("PDF PNG quality must be between 0 and 100.");
-        }
-        ValidatePositive(MaximumDocxReadBytes, nameof(MaximumDocxReadBytes));
-        ValidatePositive(MaximumOpenXmlPartCharacters, nameof(MaximumOpenXmlPartCharacters));
-        ValidatePositive(MaximumFullReadBytes, nameof(MaximumFullReadBytes));
-        ValidatePositive(MaximumRangeReadBytes, nameof(MaximumRangeReadBytes));
-        ValidatePositive(DefaultRangeLineCount, nameof(DefaultRangeLineCount));
-        ValidatePositive(MaximumRangeLineCount, nameof(MaximumRangeLineCount));
-        ValidatePositive(MaximumSearchFiles, nameof(MaximumSearchFiles));
-        ValidatePositive(MaximumDirectoryEntries, nameof(MaximumDirectoryEntries));
-        ValidatePositive(MaximumSearchFileBytes, nameof(MaximumSearchFileBytes));
-        ValidatePositive(MaximumSearchResults, nameof(MaximumSearchResults));
-        ValidatePositive(MaximumMatchesPerFile, nameof(MaximumMatchesPerFile));
-        ValidatePositive(MaximumMarkdownFiles, nameof(MaximumMarkdownFiles));
-        ValidatePositive(MaximumMarkdownSourceBytes, nameof(MaximumMarkdownSourceBytes));
-        ValidatePositive(MaximumGraphResults, nameof(MaximumGraphResults));
-        ValidatePositive(MaximumGraphExportCharacters, nameof(MaximumGraphExportCharacters));
-
-        if (DefaultRangeLineCount > MaximumRangeLineCount)
-        {
-            throw new InvalidOperationException("The default range cannot exceed the maximum range.");
-        }
-
-        if (OperationTimeout is { } timeout && (timeout <= TimeSpan.Zero || timeout > MaximumOperationTimeout))
-        {
-            throw new InvalidOperationException($"OperationTimeout must be positive and no greater than {MaximumOperationTimeout}, or null to disable it.");
-        }
-
-        if (RegexTimeout <= TimeSpan.Zero || RegexTimeout > MaximumRegexTimeout)
-        {
-            throw new InvalidOperationException("RegexTimeout must be positive and within the supported .NET regex timeout range.");
         }
     }
 

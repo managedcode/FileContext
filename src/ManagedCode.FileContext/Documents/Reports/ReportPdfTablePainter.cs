@@ -14,6 +14,7 @@ internal static class ReportPdfTablePainter
         if (columns.Count == 0) { throw new ArgumentException("table.columns is required."); }
         var width = (page.PageWidth - FileContextReportPdf.Margin * 2) / columns.Count;
         var totals = ReportJson.Property(content, "totals");
+        var highlights = ReportJson.ReadHighlights(content);
         DrawHeader(page, columns, width);
         for (var index = 0; index < rows.Count; index++)
         {
@@ -33,7 +34,7 @@ internal static class ReportPdfTablePainter
             page.Canvas.DrawRect(FileContextReportPdf.Margin, page.Y, page.PageWidth - FileContextReportPdf.Margin * 2, height, fill);
             for (var col = 0; col < columns.Count; col++)
             {
-                if (ReportJson.IsHighlighted(content, index, ReportJson.Text(columns[col], "key")))
+                if (highlights.Contains((index, ReportJson.Text(columns[col], "key"))))
                 {
                     using var highlight = ReportCanvas.Paint(new SKColor(249, 242, 218));
                     page.Canvas.DrawRect(FileContextReportPdf.Margin + col * width, page.Y, width, height, highlight);

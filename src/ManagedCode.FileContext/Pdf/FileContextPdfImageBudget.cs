@@ -15,7 +15,7 @@ internal static class FileContextPdfImageBudget
             count++;
             var imagePixels = (long)image.WidthInSamples * image.HeightInSamples;
             if (image.WidthInSamples <= 0 || image.HeightInSamples <= 0
-                || imagePixels > options.MaximumDecodedPdfImagePixels - pixels)
+                || (options.MaximumDecodedPdfImagePixels != int.MaxValue && imagePixels > options.MaximumDecodedPdfImagePixels - pixels))
             {
                 throw new IOException("The PDF page exceeds the decoded image pixel limit.");
             }

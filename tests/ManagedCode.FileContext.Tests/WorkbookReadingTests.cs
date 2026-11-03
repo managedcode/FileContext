@@ -112,6 +112,34 @@ public sealed class WorkbookReadingTests
     }
 
     [Fact]
+    public async Task Workbook_ranges_and_headers_keep_base_text_separate_from_phonetic_hints()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { EnableWriteTools = true };
+        var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
+        var created = await context.Documents.CreateWorkbookAsync("phonetic.xlsx", new([
+            new("Data", [[new(Text: "東京"), new(Text: "京都")], [new(Number: 1), new(Number: 2)]])]));
+        using (var document = SpreadsheetDocument.Open(Path.Combine(scope.Directory, created.Path), true))
+        {
+            var workbook = document.WorkbookPart!;
+            var strings = workbook.AddNewPart<SharedStringTablePart>();
+            strings.SharedStringTable = new SharedStringTable();
+            var item = strings.SharedStringTable.AppendChild(new SharedStringItem());
+            item.Append(new Text("東京"), new PhoneticRun { BaseTextStartIndex = 0, EndingBaseIndex = 2, Text = new Text("とうきょう") });
+            var cells = workbook.WorksheetParts.Single().Worksheet!.Descendants<Row>().First().Elements<Cell>().ToArray();
+            cells[0].InlineString = null;
+            cells[0].DataType = CellValues.SharedString;
+            cells[0].CellValue = new CellValue("0");
+            cells[1].InlineString!.AppendChild(new PhoneticRun { BaseTextStartIndex = 0, EndingBaseIndex = 2, Text = new Text("きょうと") });
+        }
+
+        var range = await context.Documents.ReadWorkbookRangeAsync(created.Path, "Data", 1, 1, 1, 2);
+        range.Cells.Select(static cell => cell.Value).ShouldBe(["東京", "京都"]);
+        var table = (await context.Documents.GetTablesInfoAsync(created.Path)).Tables.Single();
+        table.Headers.ShouldBe(["東京", "京都"]);
+    }
+
+    [Fact]
     public async Task Workbook_range_and_table_inspection_enforce_decompressed_part_limit()
     {
         await using var scope = await TestStorageScope.CreateAsync();

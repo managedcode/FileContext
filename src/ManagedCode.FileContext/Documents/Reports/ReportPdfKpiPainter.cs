@@ -7,17 +7,29 @@ namespace ManagedCode.FileContext;
 
 internal static class ReportPdfKpiPainter
 {
+    private const float CardGap = 8;
+    private const float PreferredCardWidth = 82;
+
     public static void Draw(FileContextReportPdf page, JsonElement content)
     {
         var items = ReportJson.Array(content, "items");
-        if (items.Count is < 2 or > 6) { throw new ArgumentException("kpi-row.items requires 2 to 6 cards."); }
-        var width = (page.PageWidth - FileContextReportPdf.Margin * 2 - (items.Count - 1) * 8) / items.Count;
+        var availableWidth = page.PageWidth - FileContextReportPdf.Margin * 2;
+        var columns = Math.Max(1, (int)((availableWidth + CardGap) / (PreferredCardWidth + CardGap)));
+        foreach (var row in items.Chunk(columns))
+        {
+            DrawRow(page, row, availableWidth);
+        }
+    }
+
+    private static void DrawRow(FileContextReportPdf page, JsonElement[] items, float availableWidth)
+    {
+        var width = (availableWidth - (items.Length - 1) * CardGap) / items.Length;
         var cards = items.Select(item => Layout(item, width, page.Theme)).ToArray();
         var height = cards.Max(card => card.Height);
         page.Ensure(height + 14);
         for (var index = 0; index < cards.Length; index++)
         {
-            var x = FileContextReportPdf.Margin + index * (width + 8);
+            var x = FileContextReportPdf.Margin + index * (width + CardGap);
             var card = cards[index];
             using var fill = ReportCanvas.Paint(new SKColor(240, 244, 248));
             page.Canvas.DrawRoundRect(new SKRect(x, page.Y, x + width, page.Y + height), 6, 6, fill);

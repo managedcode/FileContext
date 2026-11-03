@@ -26,7 +26,8 @@ public static class FileContextTableReader
             result = new(fileName, "xlsx", null, FileContextWorkbookTables.Read(workbook, headerRow, cancellationToken));
         }
         else { result = FileContextCsvTables.Read(source, fileName, headerRow, delimiter, cancellationToken); }
-        if (Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(result)) > options.MaximumRangeReadBytes)
+        if (options.MaximumRangeReadBytes != long.MaxValue &&
+            JsonSerializer.SerializeToUtf8Bytes(result).LongLength > options.MaximumRangeReadBytes)
         { throw new IOException("Table metadata exceeds the configured output read budget."); }
         return result;
     }

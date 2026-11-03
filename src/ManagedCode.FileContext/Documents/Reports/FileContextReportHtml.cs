@@ -9,11 +9,10 @@ namespace ManagedCode.FileContext;
 
 internal static partial class FileContextReportHtml
 {
-    private const int MinimumKpis = 2;
-    private const int MaximumKpis = 6;
     private const int ListMarkerLength = 2;
-    private static readonly Regex Bold = new(@"\*\*(?<text>.+?)\*\*", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
-    private static readonly Regex Link = new(@"\[(?<text>[^\]]+)\]\((?<url>https://[^\s)]+)\)", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
+    private const RegexOptions InlineRegexOptions = RegexOptions.ExplicitCapture | RegexOptions.NonBacktracking;
+    private static readonly Regex Bold = new(@"\*\*(?<text>.+?)\*\*", InlineRegexOptions, Regex.InfiniteMatchTimeout);
+    private static readonly Regex Link = new(@"\[(?<text>[^\]]+)\]\((?<url>https://[^\s)]+)\)", InlineRegexOptions, Regex.InfiniteMatchTimeout);
 
     public static string Render(FileContextReport report, FileContextReportTheme theme, CancellationToken token)
     {
@@ -82,7 +81,6 @@ internal static partial class FileContextReportHtml
     private static void Kpis(StringBuilder html, JsonElement content)
     {
         var items = ReportJson.Array(content, "items");
-        if (items.Count < MinimumKpis || items.Count > MaximumKpis) { throw new ArgumentException("kpi-row.items requires 2 to 6 cards."); }
         html.Append("<section class=\"kpis\">");
         foreach (var item in items)
         {
@@ -101,6 +99,7 @@ internal static partial class FileContextReportHtml
     {
         var columns = ReportJson.Array(content, "columns");
         if (columns.Count == 0) { throw new ArgumentException("table.columns is required."); }
+        var highlights = ReportJson.ReadHighlights(content);
         html.Append("<table><thead><tr>");
         foreach (var column in columns)
         { html.Append("<th>").Append(E(ReportJson.Text(column, "label", ReportJson.Text(column, "key")))).Append("</th>"); }
@@ -112,7 +111,7 @@ internal static partial class FileContextReportHtml
             for (var columnIndex = 0; columnIndex < columns.Count; columnIndex++)
             {
                 var column = columns[columnIndex];
-                var highlighted = ReportJson.IsHighlighted(content, rowIndex, ReportJson.Text(column, "key"));
+                var highlighted = highlights.Contains((rowIndex, ReportJson.Text(column, "key")));
                 html.Append(highlighted ? "<td class=\"highlight\">" : "<td>")
                     .Append(E(ReportJson.FormatCell(row, column))).Append("</td>");
             }

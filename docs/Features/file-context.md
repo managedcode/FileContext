@@ -16,7 +16,7 @@ In scope: standard file access, bounded line navigation, metadata, native PDF/DO
 6. Full reads fail before allocation when metadata exceeds `MaximumFullReadBytes`. Decoded UTF-8 limits retain encoder state across buffer boundaries, including split surrogate pairs.
 7. Range reads are 1-based by line, stream sequentially, return continuation metadata, and stop at configured line/byte limits.
 8. Content search is case-insensitive regular expression search with a timeout, file/match/result limits, and optional standard glob filtering.
-9. Directory listing returns direct child directories before direct child files and keeps the storage prefix private. A listing with more than `MaximumDirectoryEntries` distinct children fails with a limit error. The default is 1,000.
+9. Directory listing returns direct child directories before direct child files and keeps the storage prefix private. When a host sets `MaximumDirectoryEntries`, a listing that exceeds it fails with a limit error.
 10. Markdown graph builds include only `.md` and `.markdown` files that match the configured glob and limits. The default glob selects `.md` files. Builds use `ManagedCode.MarkdownLd.Kb`.
 11. Graph search returns package-owned match records; graph export supports JSON-LD, Turtle, Mermaid, and DOT with an output limit.
 12. Each graph operation builds from the current selected storage contents, so graph results cannot become stale between calls.
@@ -98,7 +98,7 @@ Independent writes and range reads on eight different files are tested concurren
 
 ## Generated documents
 
-The shared store and `IFileContext.Documents` create unique text/CSV/XLSX/PDF outputs. Standard listing, metadata, range reads and host streaming access use their returned paths. The document tool factory and context provider share the same implementations; hosts may register a selected subset in a native or JavaScript tool catalog. Writes must be explicitly enabled on shared options and human approval is enabled by default.
+The shared store and `IFileContext.Documents` create unique text/CSV/XLSX/PDF outputs. When configured, CSV generation checks the output byte budget as it writes UTF-8, including the BOM and escaped fields. Standard listing, metadata, range reads and host streaming access use their returned paths. The document tool factory and context provider share the same implementations; hosts may register a selected subset in a native or JavaScript tool catalog. Writes must be explicitly enabled on shared options and human approval is enabled by default.
 
 ```mermaid
 sequenceDiagram
@@ -125,10 +125,11 @@ delete any staged file. Source ownership continues through document rendering an
 DOCX reading uses the native `file_context_docx_text` tool. It reads ordinary paragraph and table
 text from the scoped `.docx` package in bounded windows. Each result includes the next paragraph
 and character offset when more text remains, so an agent can continue without loading a long
-document into one model call. The tool does not execute macros, fetch external links, or perform
-OCR on embedded images. Generic text reads refuse DOCX, and text search skips it.
-XLSX and DOCX reads also enforce `MaximumOpenXmlPartCharacters` per decompressed XML part.
-The default is 32 Mi characters.
+document into one model call. Tabs and explicit line breaks are included in paragraph text and
+cursor offsets. Text nested in an inline text box belongs to the containing paragraph and keeps the
+same paragraph numbering across windows. The tool does not execute macros, fetch external links,
+or perform OCR on embedded images. Generic text reads refuse DOCX, and text search skips it.
+Hosts can set `MaximumOpenXmlPartCharacters` to bound individual decompressed XLSX and DOCX XML parts.
 
 `file_context_pdf_text` reports a bounded text-layer prefix, total page count, and one-based pages with almost no text. It performs no OCR. `file_context_pdf_page_image` renders a complete page as PNG. `file_context_pdf_images_info` counts embedded image objects, and `file_context_pdf_image` returns one object as PNG. The direct `IFileContextPdf` methods and public byte-oriented PDF APIs support the same operations. Storage-scoped PDF reads enforce a byte cap; page rendering enforces pixel and image-byte caps. Image tools return `DataContent`; host chat pipelines must forward it as image content rather than stringify a function result.
 

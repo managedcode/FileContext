@@ -43,7 +43,13 @@ public sealed class FileContextPdfRenderDocument : IDisposable
             throw new ArgumentOutOfRangeException(nameof(scale));
         }
         var page = _document.GetPage(pageNumber);
-        if (page.Width * resolvedScale * page.Height * resolvedScale > _options.MaximumRenderedPagePixels)
+        var width = page.Width * resolvedScale;
+        var height = page.Height * resolvedScale;
+        if (width > int.MaxValue || height > int.MaxValue)
+        {
+            throw new IOException("The rendered PDF page dimensions exceed the raster format's supported range.");
+        }
+        if (_options.MaximumRenderedPagePixels != int.MaxValue && width * height > _options.MaximumRenderedPagePixels)
         {
             throw new IOException("The rendered PDF page exceeds the pixel limit.");
         }

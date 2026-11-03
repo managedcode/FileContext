@@ -13,7 +13,7 @@ public sealed class FileContextPdfProcessingTests
         var pdf = FileContextPdfTestPdfs.ScannedPages(1);
         var upload = await scope.Storage.UploadAsync(pdf, new UploadOptions { FileName = "scan.pdf" });
         upload.IsSuccess.ShouldBeTrue();
-        var options = new FileContextOptions();
+        var options = new FileContextOptions { MaximumConcurrentPdfOperations = 1 };
         using var processor = new FileContextPdfProcessor(options);
         using var permit = await processor.AcquireAsync();
         var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options, processor);
@@ -26,7 +26,7 @@ public sealed class FileContextPdfProcessingTests
     [Fact]
     public async Task Shared_processor_waits_before_source_work_and_releases_once()
     {
-        using var processor = new FileContextPdfProcessor(new FileContextOptions());
+        using var processor = new FileContextPdfProcessor(new FileContextOptions { MaximumConcurrentPdfOperations = 1 });
         var first = await processor.AcquireAsync();
         var waiting = processor.AcquireAsync();
         waiting.IsCompleted.ShouldBeFalse();
@@ -42,7 +42,7 @@ public sealed class FileContextPdfProcessingTests
     [Fact]
     public async Task Cancelled_wait_does_not_leak_a_permit()
     {
-        using var processor = new FileContextPdfProcessor(new FileContextOptions());
+        using var processor = new FileContextPdfProcessor(new FileContextOptions { MaximumConcurrentPdfOperations = 1 });
         using var first = await processor.AcquireAsync();
         using var cancellation = new CancellationTokenSource();
         var waiting = processor.AcquireAsync(cancellation.Token);

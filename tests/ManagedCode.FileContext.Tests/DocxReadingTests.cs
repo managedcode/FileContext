@@ -5,6 +5,42 @@ namespace ManagedCode.FileContext.Tests;
 public sealed class DocxReadingTests
 {
     private const string PathInScope = "memories/scan.DOCX";
+    private const int CharacterBudget = 20_000;
+
+    [Fact]
+    public async Task Docx_preserves_inline_separators_across_a_character_cursor()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { RootPrefix = "chat", MaximumDocxTextCharacters = 6 };
+        await UploadAsync(scope, FileContextDocxTestFiles.WithInlineSeparators());
+        var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
+
+        var first = await context.Documents.ReadDocxTextAsync(PathInScope);
+        first.Paragraphs.Single().Text.ShouldBe("A\tB\nC\n");
+        first.NextParagraph.ShouldBe(1);
+        first.NextCharacter.ShouldBe(6);
+
+        var second = await context.Documents.ReadDocxTextAsync(PathInScope, first.NextParagraph!.Value, first.NextCharacter);
+        second.Paragraphs.Single().Text.ShouldBe("D");
+        second.NextParagraph.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Resumed_window_keeps_text_box_paragraphs_inside_their_outer_paragraph()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { RootPrefix = "chat" };
+        await UploadAsync(scope, FileContextDocxTestFiles.WithTextBox());
+        var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
+
+        var first = await context.Documents.ReadDocxTextAsync(PathInScope, paragraphCount: 1);
+        first.Paragraphs.Single().Text.ShouldContain("boxed");
+        first.NextParagraph.ShouldBe(2);
+        var second = await context.Documents.ReadDocxTextAsync(PathInScope, first.NextParagraph!.Value, first.NextCharacter);
+
+        second.Paragraphs.Select(static paragraph => (paragraph.Number, paragraph.Text)).ShouldBe([(2, "Second"), (3, "Third")]);
+        second.NextParagraph.ShouldBeNull();
+    }
 
     [Fact]
     public async Task Paragraph_windows_include_table_text_and_resume_without_repeating_content()
@@ -31,14 +67,14 @@ public sealed class DocxReadingTests
     public async Task Long_paragraph_returns_character_cursor_and_stays_bounded()
     {
         await using var scope = await TestStorageScope.CreateAsync();
-        var options = new FileContextOptions { RootPrefix = "chat" };
+        var options = new FileContextOptions { RootPrefix = "chat", MaximumDocxTextCharacters = CharacterBudget };
         await UploadAsync(scope, FileContextDocxTestFiles.WithParagraphs(new string('X', 21_000), "Last"));
         var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
 
         var first = await context.Documents.ReadDocxTextAsync(PathInScope);
-        first.Paragraphs.Single().Text.Length.ShouldBe(FileContextDefaults.MaximumDocxTextCharacters);
+        first.Paragraphs.Single().Text.Length.ShouldBe(CharacterBudget);
         first.NextParagraph.ShouldBe(1);
-        first.NextCharacter.ShouldBe(FileContextDefaults.MaximumDocxTextCharacters);
+        first.NextCharacter.ShouldBe(CharacterBudget);
 
         var second = await context.Documents.ReadDocxTextAsync(PathInScope,
             first.NextParagraph.GetValueOrDefault(), first.NextCharacter);
@@ -75,9 +111,9 @@ public sealed class DocxReadingTests
     public async Task Docx_cursor_resumes_before_a_split_emoji_and_rejects_a_mid_pair_offset()
     {
         await using var scope = await TestStorageScope.CreateAsync();
-        var options = new FileContextOptions { RootPrefix = "chat" };
+        var options = new FileContextOptions { RootPrefix = "chat", MaximumDocxTextCharacters = CharacterBudget };
         var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
-        var prefix = new string('x', FileContextDefaults.MaximumDocxTextCharacters - 1);
+        var prefix = new string('x', CharacterBudget - 1);
         await UploadAsync(scope, FileContextDocxTestFiles.WithParagraphs(prefix + "😀tail"));
 
         var first = await context.Documents.ReadDocxTextAsync(PathInScope);

@@ -48,7 +48,7 @@ public sealed partial class FileContextService : IFileContext, IFileContextPdf
             throw new ArgumentOutOfRangeException(nameof(startLine), "Line numbers are one-based.");
         }
 
-        var count = lineCount ?? _options.DefaultRangeLineCount;
+        var count = lineCount ?? Math.Min(_options.DefaultRangeLineCount, _options.MaximumRangeLineCount);
         if (count <= 0 || count > _options.MaximumRangeLineCount)
         {
             throw new ArgumentOutOfRangeException(

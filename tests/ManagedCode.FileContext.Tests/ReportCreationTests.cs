@@ -138,7 +138,8 @@ public sealed class ReportCreationTests
             Block("table", new {
                 columns = new[] { new { key = "channel", label = "Channel", format = "" }, new { key = "value", label = "Value", format = "N1" } },
                 rows = new[] { new { channel = "Search", value = 12.5 } },
-                highlightCells = new[] { new { row = 0, column = "value" } }
+                highlightCells = new object[] { new { row = 0, column = "value" }, new { row = 0, column = "value" },
+                    new { row = 0, column = "CHANNEL" }, new { row = "0", column = "channel" } }
             })
         ], ["pdf", "html"]);
         var outputs = await new FileContextService(store, options).Documents.CreateReportAsync(report);
@@ -149,7 +150,23 @@ public sealed class ReportCreationTests
         var html = await store.ReadAsync(outputs.Files.Single(file => file.MediaType.StartsWith("text/html", StringComparison.Ordinal)).Path);
         html!.ShouldContain("<strong>Important</strong>");
         html!.ShouldContain("<li>");
-        html!.ShouldContain("class=\"highlight\"");
+        html!.ShouldContain("<a href=\"https://nywd.com/report\" rel=\"noreferrer\">source</a>");
+        html!.ShouldContain("<td>Search</td><td class=\"highlight\">12.5</td>");
+    }
+
+    [Fact]
+    public async Task Html_preserves_long_unmatched_inline_markup()
+    {
+        await using var storage = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { EnableWriteTools = true };
+        var store = new ManagedCodeStorageFileStore(storage.Storage, options);
+        var text = new string('[', 1_000_000) + " **Tail**";
+        var report = new FileContextReport("Inline markup", "inline", [Block("text", new { text })], ["html"]);
+
+        var output = await new FileContextService(store, options).Documents.CreateReportAsync(report);
+        var html = await store.ReadAsync(output.Files.Single().Path);
+
+        html!.ShouldContain(new string('[', 1_000_000) + " <strong>Tail</strong>");
     }
 
     [Fact]
@@ -171,6 +188,45 @@ public sealed class ReportCreationTests
         pdf.GetPage(1).Text.ShouldContain("First section");
         pdf.GetPage(2).Text.ShouldContain("Second section");
         pdf.GetPage(2).Text.ShouldContain("Quarterly report");
+    }
+
+    [Fact]
+    public void Pdf_wrap_preserves_exact_fit_overflow_empty_lines_and_unicode()
+    {
+        using var paint = ReportCanvas.Paint(SkiaSharp.SKColors.Black, 10);
+        var width = ReportCanvas.MeasureText("WW", paint);
+
+        var lines = ReportCanvas.Wrap("WW\r\nWWW\n\nЇ😀", paint, width);
+
+        lines.ShouldBe(["WW", "WW", "W", "", "Ї😀"]);
+    }
+
+    [Fact]
+    public async Task Long_pdf_heading_flows_across_pages_and_honors_an_explicit_page_budget()
+    {
+        await using var storage = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { EnableWriteTools = true };
+        var store = new ManagedCodeStorageFileStore(storage.Storage, options);
+        var context = new FileContextService(store, options);
+        var title = string.Join('\n', Enumerable.Range(1, 30).Select(index => $"Section {index}"));
+        var report = new FileContextReport("Overview", "overview", [
+            Block("heading", new { title, subtitle = "Final subtitle" }),
+            Block("text", new { text = "Body follows" })
+        ], ["pdf"]);
+
+        var output = (await context.Documents.CreateReportAsync(report)).Files.Single();
+        await using var stream = await store.OpenReadAsync(output.Path);
+        using var document = PdfDocument.Open(stream);
+        document.NumberOfPages.ShouldBe(2);
+        document.GetPage(1).Text.ShouldContain("Section 1");
+        document.GetPage(2).Text.ShouldContain("Section 30");
+        document.GetPage(2).Text.ShouldContain("Final subtitle");
+        document.GetPage(2).Text.ShouldContain("Body follows");
+
+        options.MaximumReportPages = 1;
+        var error = await Should.ThrowAsync<ArgumentException>(() => context.Documents.CreateReportAsync(report));
+        error.Message.ShouldContain("exceeds 1 pages");
+        (await context.ListFilesAsync()).Select(static file => file.Path).ShouldBe([output.Path]);
     }
 
     [Fact]

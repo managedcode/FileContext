@@ -35,7 +35,7 @@ public sealed class FileContextPdfSource : IAsyncDisposable
                 return new FileContextPdfSource(source);
             }
             staged = CreateTemporaryFile(options);
-            using var bounded = new StorageReadBudgetStream(source, options.MaximumPdfReadBytes);
+            using var bounded = new StorageReadBudgetStream(source, options.PdfSourceReadBudget);
             await bounded.CopyToAsync(staged, options.PdfSourceBufferBytes, cancellationToken).ConfigureAwait(false);
             staged.Position = 0;
             disposeSourceOnFailure = false;
@@ -60,7 +60,7 @@ public sealed class FileContextPdfSource : IAsyncDisposable
             throw new ArgumentException("PDF parsing requires a readable seekable stream. Stage it with FileContextPdfSource.OpenAsync.", nameof(source));
         }
         options.Validate();
-        if (source.Length > options.MaximumPdfReadBytes)
+        if (source.Length > options.PdfSourceReadBudget)
         {
             throw new IOException("The PDF exceeds the read limit.");
         }

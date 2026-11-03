@@ -15,8 +15,7 @@ internal static class FileContextWorkbookTables
     {
         if (headerRow > MaximumRows) { throw new ArgumentOutOfRangeException(nameof(headerRow)); }
         var workbook = document.WorkbookPart ?? throw new InvalidDataException("The package has no Excel workbook.");
-        var strings = workbook.SharedStringTablePart?.SharedStringTable?.Elements<SharedStringItem>()
-            .Select(static item => string.Concat(item.Descendants<Text>().Select(text => text.Text))).ToArray() ?? [];
+        var strings = FileContextWorkbookReader.ReadSharedStrings(workbook);
         var result = new List<FileContextTableInfo>();
         foreach (var sheet in workbook.Workbook?.Sheets?.Elements<Sheet>() ?? [])
         {
@@ -51,6 +50,7 @@ internal static class FileContextWorkbookTables
     {
         var accumulator = new TableAccumulator(bounds);
         using var reader = OpenXmlReader.Create(part);
+        var headerCells = new Dictionary<int, string>();
         var rowNumber = 0;
         while (reader.Read())
         {
@@ -59,20 +59,24 @@ internal static class FileContextWorkbookTables
             var row = (Row)reader.LoadCurrentElement()!;
             rowNumber = row.RowIndex is null ? rowNumber + 1 : checked((int)row.RowIndex.Value);
             if (rowNumber < bounds.FirstRow || rowNumber > bounds.LastRow) { continue; }
-            var cells = new Dictionary<int, string>();
+            var captureHeader = accumulator.ShouldCaptureHeader(rowNumber);
             var hasData = false;
             var column = 0;
+            var lastColumn = 0;
             foreach (var cell in row.Elements<Cell>())
             {
                 token.ThrowIfCancellationRequested();
                 column = cell.CellReference is null ? column + 1 : FileContextWorkbookReader.ReadColumn(cell.CellReference.Value!);
                 if (column < bounds.StartColumn || column > bounds.EndColumn) { continue; }
-                var value = FileContextWorkbookReader.ReadCell(cell, strings, string.Empty);
-                hasData |= value.Value.Length > 0 || value.Formula is not null;
-                if (value.Value.Length > 0 || value.Formula is not null || cell.InlineString is not null || cell.CellValue is not null)
-                { cells[column] = value.Value; }
+                var value = FileContextWorkbookReader.ReadCellValue(cell, strings, cell.DataType?.Value);
+                var containsData = value.Length > 0 || cell.CellFormula?.Text is not null;
+                hasData |= containsData;
+                if (!containsData && cell.InlineString is null && cell.CellValue is null) { continue; }
+                lastColumn = Math.Max(lastColumn, column);
+                if (captureHeader) { headerCells[column] = value; }
             }
-            accumulator.Add(rowNumber, cells, hasData);
+            accumulator.Add(rowNumber, headerCells, lastColumn, hasData);
+            headerCells.Clear();
         }
         return accumulator.Result();
     }
@@ -91,7 +95,9 @@ internal static class FileContextWorkbookTables
         private int lastColumn = bounds.Names is null ? bounds.StartColumn - 1 : bounds.EndColumn;
         private long rows;
 
-        public void Add(int row, Dictionary<int, string> cells, bool hasData)
+        public bool ShouldCaptureHeader(int row) => row == headerRow || (headerRow is null && bounds.Names is null);
+
+        public void Add(int row, Dictionary<int, string> cells, int rowLastColumn, bool hasData)
         {
             if (headerRow.HasValue && row < headerRow) { return; }
             if (bounds.Names is null && !headerRow.HasValue && hasData) { headerRow = row; }
@@ -101,7 +107,7 @@ internal static class FileContextWorkbookTables
                 foreach (var (column, value) in cells) { headers[column] = value; }
             }
             else if ((headerRow.HasValue || bounds.Names is not null) && hasData) { rows++; }
-            if (cells.Count > 0 && (hasData || row == headerRow)) { lastColumn = Math.Max(lastColumn, cells.Keys.Max()); }
+            if (hasData || row == headerRow) { lastColumn = Math.Max(lastColumn, rowLastColumn); }
         }
 
         public FileContextTableInfo Result()

@@ -47,12 +47,13 @@ public sealed class FileContextBoundaryTests
     public async Task ReadRange_WhenArgumentsAreOutsideConfiguredBounds_RejectsRequest()
     {
         await using var scope = await TestStorageScope.CreateAsync();
-        var service = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage));
+        var options = new FileContextOptions { MaximumRangeLineCount = 1_000 };
+        var service = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
 
         await Should.ThrowAsync<ArgumentOutOfRangeException>(() => service.ReadRangeAsync("notes.txt", startLine: 0));
         await Should.ThrowAsync<ArgumentOutOfRangeException>(() => service.ReadRangeAsync("notes.txt", lineCount: 0));
         await Should.ThrowAsync<ArgumentOutOfRangeException>(() =>
-            service.ReadRangeAsync("notes.txt", lineCount: FileContextDefaults.MaximumRangeLineCount + 1));
+            service.ReadRangeAsync("notes.txt", lineCount: options.MaximumRangeLineCount + 1));
     }
 
     [Fact]

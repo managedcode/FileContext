@@ -80,13 +80,13 @@ flowchart TD
 ## Operational limits
 
 PDF callers share `FileContextPdfProcessor`, acquiring a permit before reading or downloading the
-source and retaining it through parsing/rendering. `MaximumConcurrentPdfOperations` defaults to one.
+source and retaining it through parsing/rendering when the host sets `MaximumConcurrentPdfOperations`.
 `FileContextPdfRenderDocument` exposes page count and sequential page rendering from one parsed PDF;
 dispose it after the batch. The low-level synchronous image helpers remain caller-scheduled APIs.
 
 PDF text, page rendering and embedded-image APIs accept bounded seekable streams. Storage-backed PDF tools retain seekable local `FileStream`/`MemoryStream` inputs but asynchronously stage other streams, including seekable cloud streams, to an automatically deleted temporary file. PdfPig's synchronous byte reads and seeks then remain local, without blocking on repeated network ranges. `PdfSourceStagingMode.TemporaryFile` also stages local inputs. `PdfSourceBufferBytes` bounds every copy read and `PdfTemporaryDirectory` optionally selects an existing host directory. No whole-document managed array is created. Native raster decoding has a separate per-page source-image pixel budget; lowering output scale does not reduce source bitmap allocation.
 
-All potentially large operations are controlled by `IOptions<FileContextOptions>`: PDF source/page/image budgets, full-read bytes, range bytes, files scanned, bytes per searched file, matches per file, total search results, graph documents, graph source bytes, and exported graph characters. Non-seekable cloud streams are supported by sequential streaming.
+Hosts can configure bounds for large operations through `IOptions<FileContextOptions>`: PDF source/page/image budgets, full-read bytes, range bytes, files scanned, bytes per searched file, matches per file, total search results, graph documents, graph source bytes, and exported graph characters. Non-seekable cloud streams are supported by sequential streaming.
 
 ## Start here
 
@@ -112,7 +112,7 @@ flowchart LR
 
 ## Native workbook reads
 
-`FileContextDocumentService` opens XLSX packages read-only from the scoped storage adapter.
+`FileContextDocumentService` opens XLSX packages read-only from the scoped storage adapter. Local seekable streams can be read directly when the host has left the source budget unset. Other streams and reads with a configured source budget are staged before parsing.
 `FileContextWorkbookReader` maps worksheets and cell rectangles into package-owned result records.
 It preserves coordinates and stored types without evaluating formulas or accessing external links.
 The same service opens DOCX packages read-only and streams bounded paragraph text through

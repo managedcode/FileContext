@@ -87,17 +87,21 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
             return null;
         }
 
-        var metadata = await GetMetadataCoreAsync(storagePath, cancellationToken).ConfigureAwait(false);
-        if (metadata.Length > (ulong)_options.MaximumFullReadBytes)
+        var limit = _options.MaximumFullReadBytes;
+        if (limit != long.MaxValue)
         {
-            throw new IOException($"File '{path}' is {metadata.Length} bytes; the full-read limit is {_options.MaximumFullReadBytes} bytes. Use file_context_read_range.");
+            var metadata = await GetMetadataCoreAsync(storagePath, cancellationToken).ConfigureAwait(false);
+            if (metadata.Length > (ulong)limit)
+            {
+                throw new IOException($"File '{path}' is {metadata.Length} bytes; the full-read limit is {limit} bytes. Use file_context_read_range.");
+            }
         }
 
         var stream = await OpenReadCoreAsync(storagePath, cancellationToken).ConfigureAwait(false);
         await using (stream.ConfigureAwait(false))
         {
-            using var bounded = new StorageReadBudgetStream(stream, _options.MaximumFullReadBytes);
-            return await StorageTextReader.ReadAsync(bounded, _options.MaximumFullReadBytes, cancellationToken).ConfigureAwait(false);
+            using var bounded = limit == long.MaxValue ? null : new StorageReadBudgetStream(stream, limit);
+            return await StorageTextReader.ReadAsync(bounded ?? stream, limit, cancellationToken).ConfigureAwait(false);
         }
     }
 

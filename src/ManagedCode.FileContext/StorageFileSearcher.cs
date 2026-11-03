@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text;
 using System.Text.RegularExpressions;
 using ManagedCode.Storage.Core.Models;
@@ -95,10 +96,11 @@ internal sealed class StorageFileSearcher(
     internal static async Task<List<FileSearchMatch>> SearchLinesAsync(
         Stream stream, Regex regex, FileContextOptions options, CancellationToken cancellationToken)
     {
-        using var bounded = new StorageReadBudgetStream(stream, options.MaximumSearchFileBytes);
-        using var reader = new StreamReader(bounded, Encoding.UTF8, true, leaveOpen: true);
+        using var bounded = options.MaximumSearchFileBytes == long.MaxValue
+            ? null : new StorageReadBudgetStream(stream, options.MaximumSearchFileBytes);
+        using var reader = new StreamReader(bounded ?? stream, Encoding.UTF8, true, leaveOpen: true);
         var lineReader = new StorageTextLineReader(reader, long.MaxValue);
-        StringBuilder? splitLine = null;
+        ArrayBufferWriter<char>? splitLine = null;
         var matches = new List<FileSearchMatch>();
         var lineNumber = 0;
 
@@ -108,10 +110,10 @@ internal sealed class StorageFileSearcher(
             lineNumber++;
             if (!lineReader.TryReadBufferedLine(out var line))
             {
-                splitLine ??= new StringBuilder();
-                splitLine.Clear();
-                await lineReader.ReadLineAsync(splitLine, 0, cancellationToken).ConfigureAwait(false);
-                line = splitLine.ToString().AsMemory();
+                splitLine ??= new ArrayBufferWriter<char>();
+                splitLine.ResetWrittenCount();
+                await lineReader.ReadLineAsync(splitLine, cancellationToken).ConfigureAwait(false);
+                line = splitLine.WrittenMemory;
             }
 
             if (IsMatch(regex, line.Span, cancellationToken))
