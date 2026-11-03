@@ -197,9 +197,9 @@ an existing host directory. Disposal, cancellation and staging failures remove t
 
 `IFileContextPdf.ReadPdfTextAsync(path)` returns bounded text, `PageCount`, and one-based `PagesWithoutText`. It does not perform OCR. A scanned page can instead be rendered with `RenderPdfPageAsync(path, pageNumber)`, which returns PNG `DataContent`. Use `CountPdfPageImagesAsync` and `ExtractPdfImageAsync` when the original embedded pictures are needed rather than the complete page. The four read-only `file_context_pdf_*` tools expose the same operations from scoped storage.
 
-For an authenticated PDF already held as bytes, `FileContextPdfTextExtractor.Extract`, `FileContextPdfImages.RenderPagePng`, and `FileContextPdfImages.ExtractPageImagesPng` work without storing it. PDF source reads default to 100 MiB and accept `FileContextOptions` for a different limit; page rasterization also uses configured pixel and PNG limits. `FileContextImageContent` creates model-visible `DataContent` from PNG bytes or base64 and `UriContent` from an HTTPS URL. A URL reference is not fetched by FileContext, so the model provider must be able to access it. A host must pass image content to its model as image content. A generic OpenAI Chat function result serializes it as text, so hosts must explicitly bridge image tool results into a multimodal model message.
+For an authenticated PDF already held as bytes, `FileContextPdfTextExtractor.Extract`, `FileContextPdfImages.RenderPagePng`, and `FileContextPdfImages.ExtractPageImagesPng` work without storing it. Hosts can set PDF source, pixel and PNG limits through `FileContextOptions`. `FileContextImageContent` creates model-visible `DataContent` from PNG bytes or base64 and `UriContent` from an HTTPS URL. A URL reference is not fetched by FileContext, so the model provider must be able to access it. A host must pass image content to its model as image content. A generic OpenAI Chat function result serializes it as text, so hosts must explicitly bridge image tool results into a multimodal model message.
 
-`file_context_docx_text(path, startParagraph?, startCharacter?, paragraphCount?)` reads ordinary paragraph and table text from a scoped DOCX package. The result contains numbered paragraph segments and `nextParagraph`/`nextCharacter`; use that cursor to continue a long document. Reads are limited to 50 paragraphs and 20,000 characters per call, with a configurable 25 MiB source limit (`MaximumDocxReadBytes`). It does not OCR embedded images. DOCX and XLSX packages are excluded from generic text reads and grep.
+`file_context_docx_text(path, startParagraph?, startCharacter?, paragraphCount?)` reads ordinary paragraph and table text from a scoped DOCX package. The result contains numbered paragraph segments and `nextParagraph`/`nextCharacter`; use that cursor to continue a long document. The caller can request a paragraph count. Hosts can also configure `MaximumDocxTextCharacters` and `MaximumDocxReadBytes`. It does not OCR embedded images. DOCX and XLSX packages are excluded from generic text reads and grep.
 
 ## Explore Markdown as a graph
 
@@ -253,32 +253,20 @@ var tools = workspaces.GetRequiredKeyedService<FileContextProvider>("research");
 
 Paths are logical, relative, and `/`-separated. `RootPrefix` scopes storage access. Path validation rejects traversal and unsafe path forms before storage calls. File contents remain untrusted tool data.
 
-| Option | Default |
-| --- | ---: |
-| `MaximumPdfReadBytes` | 100 MiB |
-| `MaximumImageBytes` | 8 MiB |
-| `MaximumRenderedPagePixels` / `MaximumImagesPerPdfPage` | 4,000,000 / 20 |
-| `DefaultPdfPageScale` / `MinimumPdfPageScale` / `MaximumPdfPageScale` | 1.5 / 0.5 / 3 |
-| `PdfPngQuality` | 100 |
-| `MaximumFullReadBytes` | 1 MiB |
-| `MaximumRangeReadBytes` | 256 KiB |
-| `MaximumDirectoryEntries` | 1,000 direct children |
-| `MaximumOpenXmlPartCharacters` | 32 Mi characters per decompressed XML part |
-| `MaximumGeneratedFileBytes` | 64 MiB per generated file or complete report |
-| `MaximumReportInputBytes` / `MaximumReportPages` | 10,000,000 bytes / 60 pages |
-| `DefaultRangeLineCount` / `MaximumRangeLineCount` | 200 / 1,000 |
-| `MaximumSearchFiles` | 500 |
-| `MaximumSearchFileBytes` | 4 MiB |
-| `MaximumSearchResults` / `MaximumMatchesPerFile` | 100 / 20 |
-| `RegexTimeout` | 2 seconds per regex match |
-| `OperationTimeout` | `null` (reports default to 60 seconds) |
-| `MarkdownGlob` | `**/*.md` |
-| `MaximumMarkdownFiles` | 100 |
-| `MaximumMarkdownSourceBytes` | 1 MiB per file |
-| `MaximumGraphResults` | 20 |
-| `MaximumGraphExportCharacters` | 200,000 |
+Size, count, PDF concurrency, and deadline limits apply when configured by the host or requested by the caller. Range, DOCX and PDF text operations return the complete remaining content when the caller omits the window size and the host has left the relevant options at their defaults.
 
-These settings are available through `FileContextOptions`; their named defaults are exposed by `FileContextDefaults`. Credentials, container lifecycle, authorization, and session persistence remain host responsibilities. When saving conversations, preserve tool-call/result pairs and handle interrupted turns before replaying history.
+| Option | Default |
+| --- | --- |
+| Numeric `Maximum*` capacity options | No FileContext limit. `int.MaxValue` or `long.MaxValue` represents the unset capacity |
+| `MaximumOpenXmlPartCharacters` | `0`, which delegates to Open XML's unlimited setting |
+| `DefaultRangeLineCount` | Remaining lines within any configured maximum |
+| `DefaultPdfPageScale` / `PdfPngQuality` | 1.5 / 100 |
+| `MinimumPdfPageScale` / `MaximumPdfPageScale` | Positive scales representable by the raster engine |
+| `RegexTimeout` | `Regex.InfiniteMatchTimeout` |
+| `OperationTimeout` | `null` |
+| `MarkdownGlob` | `**/*.md` |
+
+These settings are available through `FileContextOptions`. Credentials, container lifecycle, authorization, and session persistence remain host responsibilities. When saving conversations, preserve tool-call/result pairs and handle interrupted turns before replaying history.
 
 ### Configure limits and timeouts
 
@@ -305,7 +293,7 @@ services.AddManagedCodeFileContext(storage, options =>
 });
 ```
 
-`RegexTimeout` limits **one regex match on one line**, protecting the process from excessive backtracking in a model-supplied pattern. It is not a two-second deadline for the whole search. Choose a finite positive value supported by .NET Regex. Size/count limits must be positive, and the default line count cannot exceed the maximum.
+`RegexTimeout` limits **one regex match on one line**, protecting the process from excessive backtracking in a model-supplied pattern. Set a finite positive value supported by .NET Regex to enable it. Configured size/count limits must be positive, except that zero disables the Open XML part limit. An explicitly configured default line count must fit its maximum.
 
 In a host that uses Microsoft configuration binding, the same options can come from `appsettings.json`, environment variables, or another configuration source:
 
@@ -421,7 +409,7 @@ await using var bytes = await store.OpenReadAsync(report.Path);
 
 `FileContextProvider` exposes `file_context_create_text`, `file_context_create_csv`, `file_context_create_workbook`, and `file_context_create_pdf` when writes are enabled. `FileContextDocumentTools.Create(store, options)` returns those same native functions for host-managed tool registries, including sandboxed JavaScript bridges.
 
-CSV preserves literal values and escapes quotes, delimiters and newlines. XLSX supports multiple sheets and text/number/boolean/formula cells; Excel calculates explicit formulas when opened. PDF supports paginated paragraphs and a title with embedded Noto Sans for Latin/Cyrillic text. The Noto Sans font is distributed under the bundled SIL Open Font License. The default generated-file budget is 64 MiB, configurable through `MaximumGeneratedFileBytes`; cancellation and `OperationTimeout` apply to generation and persistence.
+CSV preserves literal values and escapes quotes, delimiters and newlines. XLSX supports multiple sheets and text/number/boolean/formula cells; Excel calculates explicit formulas when opened. PDF supports paginated paragraphs and a title with embedded Noto Sans for Latin/Cyrillic text. The Noto Sans font is distributed under the bundled SIL Open Font License. Hosts can set `MaximumGeneratedFileBytes` explicitly. Cancellation and any configured `OperationTimeout` apply to generation and persistence.
 
 Document generation uses DocumentFormat.OpenXml (MIT), PdfPig (Apache-2.0), and bundled Noto Sans (OFL-1.1). CSV writing uses the .NET runtime. These components do not require a paid commercial license. See [dependency licenses](docs/Development/dependency-licenses.md) for the audited package boundary and font notice.
 
@@ -450,6 +438,7 @@ The read-only agent tool is `file_context_tables_info`; it follows read approval
 XLSX returns each named table (excluding its header and totals), or a worksheet summary
 when no named tables exist. Blank and duplicate headers retain column positions.
 CSV detects comma, semicolon, tab or pipe, or accepts an explicit single-character delimiter.
+Inspection materializes the header and scans data records for width and count. Quoted line endings and blank lines remain part of the field.
 Quoted multiline fields form one record; physically empty lines are skipped.
 The optional one-based headerRow selects a CSV logical record or worksheet row;
 otherwise the first nonempty record/row is the header. Named Excel tables own their headers.

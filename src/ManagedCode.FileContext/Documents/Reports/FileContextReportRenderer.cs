@@ -10,7 +10,7 @@ internal static class FileContextReportRenderer
     public static IReadOnlyList<FileContextReportOutput> Render(FileContextReport report, FileContextOptions options,
         long maximumOutputBytes, CancellationToken token)
     {
-        Validate(report, options.MaximumReportInputBytes);
+        Validate(report, options.MaximumReportInputBytes, token);
         var theme = report.Theme ?? new FileContextReportTheme();
         var name = StoragePathScope.Normalize(report.FileName);
         var extension = Path.GetExtension(name);
@@ -58,7 +58,7 @@ internal static class FileContextReportRenderer
         { throw new ArgumentException($"blocks[{index}] (chart) failed: {error.Message}", nameof(report), error); }
     }
 
-    private static void Validate(FileContextReport report, int maximumInputBytes)
+    private static void Validate(FileContextReport report, int maximumInputBytes, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(report);
         if (string.IsNullOrWhiteSpace(report.Title)) { throw new ArgumentException("title is required.", nameof(report)); }
@@ -68,15 +68,31 @@ internal static class FileContextReportRenderer
         { throw new ArgumentException("outputs must contain pdf, html, or png.", nameof(report)); }
         if (report.PageSize is not ("Letter" or "A4") || report.Orientation is not ("portrait" or "landscape"))
         { throw new ArgumentException("pageSize must be Letter or A4 and orientation must be portrait or landscape.", nameof(report)); }
-        if (JsonSerializer.SerializeToUtf8Bytes(report).Length > maximumInputBytes)
-        { throw new ArgumentException($"Report input exceeds {maximumInputBytes} bytes.", nameof(report)); }
+        if (maximumInputBytes != int.MaxValue)
+        {
+            ValidateInputSize(report, maximumInputBytes, token);
+        }
         for (var index = 0; index < report.Blocks.Count; index++)
         {
-            var block = report.Blocks[index];
+            token.ThrowIfCancellationRequested();
+            var block = report.Blocks[index] ?? throw new ArgumentException($"blocks[{index}] is required.", nameof(report));
             if (block.Type is not ("heading" or "text" or "kpi-row" or "chart" or "table" or "image" or "callout" or "page-break"))
             { throw new ArgumentException($"blocks[{index}].type '{block.Type}' is unsupported.", nameof(report)); }
             if (block.Content.ValueKind is not (JsonValueKind.Object or JsonValueKind.Undefined))
             { throw new ArgumentException($"blocks[{index}].content must be an object.", nameof(report)); }
+        }
+    }
+
+    private static void ValidateInputSize(FileContextReport report, int maximumInputBytes, CancellationToken token)
+    {
+        using var counter = new ReportInputBudgetStream(maximumInputBytes, token);
+        try
+        {
+            JsonSerializer.Serialize(counter, report);
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new ArgumentException(exception.Message, nameof(report), exception);
         }
     }
 }

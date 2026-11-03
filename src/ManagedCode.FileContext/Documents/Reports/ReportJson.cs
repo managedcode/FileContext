@@ -36,9 +36,17 @@ internal static class ReportJson
         return value.ToString();
     }
 
-    public static bool IsHighlighted(JsonElement table, int rowIndex, string key) =>
-        Array(table, "highlightCells").Any(item =>
-            Property(item, "row").ValueKind == JsonValueKind.Number &&
-            Property(item, "row").TryGetInt32(out var row) && row == rowIndex &&
-            string.Equals(Text(item, "column"), key, StringComparison.Ordinal));
+    public static HashSet<(int Row, string Column)> ReadHighlights(JsonElement table)
+    {
+        var cells = Property(table, "highlightCells");
+        HashSet<(int Row, string Column)> highlights = [];
+        if (cells.ValueKind != JsonValueKind.Array) { return highlights; }
+        foreach (var item in cells.EnumerateArray())
+        {
+            var row = Property(item, "row");
+            if (row.ValueKind == JsonValueKind.Number && row.TryGetInt32(out var index))
+            { highlights.Add((index, Text(item, "column"))); }
+        }
+        return highlights;
+    }
 }

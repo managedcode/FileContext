@@ -65,6 +65,23 @@ public sealed class TableInspectionTests
     }
 
     [Fact]
+    public async Task Workbook_explicit_header_counts_formula_only_rows_and_keeps_trailing_empty_cells()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { EnableWriteTools = true };
+        var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
+        var file = await context.Documents.CreateWorkbookAsync("headers.xlsx", new([new("Data", [
+            [new(Text: "Preface"), new(), new(), new(Text: "Outside the table")], [], [new(Text: "Label")],
+            [new(), new(Formula: "1+1")], [new(), new(), new(), new(Text: "")], [new(Text: "Data"), new(), new(Text: "")]])]));
+
+        var table = (await context.Documents.GetTablesInfoAsync(file.Path, headerRow: 3)).Tables.Single();
+
+        table.HeaderRow.ShouldBe(3);
+        table.Headers.ShouldBe(["Label", "", ""]);
+        table.RowCount.ShouldBe(2);
+    }
+
+    [Fact]
     public async Task Named_excel_tables_exclude_totals_and_keep_offsets()
     {
         await using var scope = await TestStorageScope.CreateAsync();
@@ -116,5 +133,78 @@ public sealed class TableInspectionTests
         Should.Throw<OperationCanceledException>(() => FileContextTableReader.Read(source, "file.csv", cancellationToken: new(true)));
         Should.Throw<IOException>(() => FileContextTableReader.Read(source, "file.csv", options: new() { MaximumFullReadBytes = 1 }));
         Should.Throw<IOException>(() => FileContextTableReader.Read(source, "file.csv", options: new() { MaximumRangeReadBytes = 1 }));
+    }
+
+    [Fact]
+    public void Csv_counts_a_quoted_record_beyond_the_former_parser_ceiling()
+    {
+        using var source = new MemoryStream();
+        var chunk = new string('x', 5_100_000);
+        using (var writer = new StreamWriter(source, leaveOpen: true))
+        {
+            writer.Write("Header,Second\n\"");
+            writer.Write(chunk);
+            writer.Write('\n');
+            writer.Write(chunk);
+            writer.Write("\",1\nlast,2");
+        }
+
+        var table = FileContextTableReader.Read(source, "file.csv", delimiter: ",").Tables.Single();
+
+        table.Headers.ShouldBe(["Header", "Second"]);
+        table.RowCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Csv_preserves_blank_lines_and_crlf_inside_quoted_headers()
+    {
+        using var source = new MemoryStream(Encoding.UTF8.GetBytes("  \"line 1\r\n\r\nline 3\"  ,second\r\n,,\r\nlast,\"\""));
+
+        var table = FileContextTableReader.Read(source, "file.csv").Tables.Single();
+
+        table.Headers.ShouldBe(["line 1\r\n\r\nline 3", "second", ""]);
+        table.RowCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Csv_round_trip_preserves_columns_in_tab_only_records()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { EnableWriteTools = true };
+        var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
+        var csv = await context.Documents.CreateCsvAsync("ragged.csv", new([["A", "B"], ["1", "2"], ["", "", "", ""]], "\t"));
+
+        var table = (await context.Documents.GetTablesInfoAsync(csv.Path)).Tables.Single();
+
+        table.Headers.ShouldBe(["A", "B", "", ""]);
+        table.RowCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Csv_handles_escaped_quotes_across_buffers_and_reports_the_malformed_physical_line()
+    {
+        var prefix = new string('x', 4_094);
+        var header = "\"" + prefix + "\"\"tail\",second\r\n";
+        using var source = new MemoryStream(Encoding.UTF8.GetBytes(header + "value,1"));
+        var table = FileContextTableReader.Read(source, "file.csv", delimiter: ",").Tables.Single();
+        table.Headers.ShouldBe([prefix + "\"tail", "second"]);
+        table.RowCount.ShouldBe(1);
+
+        using var malformed = new MemoryStream(Encoding.UTF8.GetBytes(header + "\"value\"junk,1"));
+        var error = Should.Throw<MalformedLineException>(() => FileContextTableReader.Read(malformed, "file.csv", delimiter: ","));
+        error.LineNumber.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Csv_counts_crlf_split_across_buffers_and_standalone_line_endings()
+    {
+        const string prefix = "key,value\r\nkey,\"";
+        var padding = new string('x', 4_095 - prefix.Length);
+        var record = prefix + padding + "\r\nfirst\nsecond\rthird\"\r\n";
+        using var source = new MemoryStream(Encoding.UTF8.GetBytes(record + "\"unterminated"));
+
+        var error = Should.Throw<MalformedLineException>(() => FileContextTableReader.Read(source, "file.csv", delimiter: ","));
+
+        error.LineNumber.ShouldBe(6);
     }
 }

@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text;
 
 namespace ManagedCode.FileContext;
@@ -48,9 +49,7 @@ internal sealed class StorageTextLineReader(StreamReader reader, long maximumByt
         var counter = new Utf8ByteCounter();
         do
         {
-            var available = BufferedCharacters;
-            var lineBreak = available.IndexOfAny('\r', '\n');
-            var chunk = lineBreak < 0 ? available : available[..lineBreak];
+            var complete = ReadBufferedChunk(out var chunk);
             if (destination is not null)
             {
                 counter.Append(chunk);
@@ -58,16 +57,33 @@ internal sealed class StorageTextLineReader(StreamReader reader, long maximumByt
                 destination.Append(chunk);
             }
 
-            _position += chunk.Length;
-            if (lineBreak >= 0)
-            {
-                ConsumeLineBreak();
-                break;
-            }
+            if (complete) { break; }
         }
         while (await EnsureBufferedAsync(cancellationToken).ConfigureAwait(false));
 
         return counter.TotalBytes;
+    }
+
+    public async ValueTask ReadLineAsync(IBufferWriter<char> destination, CancellationToken cancellationToken)
+    {
+        do
+        {
+            var complete = ReadBufferedChunk(out var chunk);
+            destination.Write(chunk);
+            if (complete) { return; }
+        }
+        while (await EnsureBufferedAsync(cancellationToken).ConfigureAwait(false));
+    }
+
+    private bool ReadBufferedChunk(out ReadOnlySpan<char> chunk)
+    {
+        var available = BufferedCharacters;
+        var lineBreak = available.IndexOfAny('\r', '\n');
+        chunk = lineBreak < 0 ? available : available[..lineBreak];
+        _position += chunk.Length;
+        if (lineBreak < 0) { return false; }
+        ConsumeLineBreak();
+        return true;
     }
 
     private void ConsumeLineBreak() => _skipLineFeed = _buffer[_position++] == '\r';

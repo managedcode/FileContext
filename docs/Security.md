@@ -12,7 +12,7 @@
 - Path normalization rejects rooted, traversal, backslash, null-byte, and ambiguous segment inputs.
 - `RootPrefix` confines every operation to a configured storage subtree.
 - Write tools are disabled by default. If enabled, Agent Framework approval is still required by default.
-- File reads, individual range lines, searches, graph sources, graph exports, regex execution, and result counts are bounded while streaming; even a giant line is rejected before proportional buffering.
+- Hosts can set explicit bounds for file reads, range lines, searches, graph sources, exports, result counts, and regex execution. The library applies the configured byte bounds while streaming.
 - The provider advertises tools and safe usage instructions; it does not promote file contents into system instructions.
 - Secrets stay inside the configured storage provider. Tool results expose logical paths and content only, never provider connection details.
 

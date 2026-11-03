@@ -13,6 +13,11 @@ internal static class StorageTextReader
         CancellationToken cancellationToken)
     {
         using var reader = new StreamReader(stream, Encoding.UTF8, true, ReaderBufferSize, leaveOpen: true);
+        if (limit == long.MaxValue)
+        {
+            return await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         var buffer = new char[CharacterBufferLength];
         var builder = new StringBuilder();
         var counter = new Utf8ByteCounter();

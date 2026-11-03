@@ -55,8 +55,7 @@ internal static class FileContextWorkbookReader
             ?? throw new ArgumentException("The requested worksheet does not exist.", nameof(sheetName));
         var worksheet = workbook.GetPartById(sheet.Id!) as WorksheetPart
             ?? throw new InvalidDataException("The requested sheet is not a worksheet.");
-        var strings = workbook.SharedStringTablePart?.SharedStringTable?.Elements<SharedStringItem>()
-            .Select(static item => string.Concat(item.Descendants<Text>().Select(text => text.Text))).ToArray() ?? [];
+        var strings = ReadSharedStrings(workbook);
         var cells = ReadCells(worksheet, strings, startRow, rowCount, startColumn, columnCount, byteLimit, token);
         var range = $"{ColumnName(startColumn)}{startRow}:{ColumnName(startColumn + columnCount - 1)}{startRow + rowCount - 1}";
         return new(path, sheetName, range, cells);
@@ -129,18 +128,10 @@ internal static class FileContextWorkbookReader
         return previous + 1;
     }
 
-    internal static FileContextWorkbookCell ReadCell(Cell cell, string[] strings, string address)
+    private static FileContextWorkbookCell ReadCell(Cell cell, string[] strings, string address)
     {
         var type = cell.DataType?.Value;
-        var value = cell.CellValue?.Text ?? string.Empty;
-        if (type == CellValues.SharedString)
-        {
-            if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var index) || index < 0 || index >= strings.Length)
-            { throw new InvalidDataException("Workbook cell contains an invalid shared-string reference."); }
-            value = strings[index];
-        }
-        if (type == CellValues.InlineString)
-        { value = string.Concat(cell.InlineString?.Descendants<Text>().Select(static text => text.Text) ?? []); }
+        var value = ReadCellValue(cell, strings, type);
         var kind = "number";
         if (type == CellValues.SharedString || type == CellValues.InlineString || type == CellValues.String) { kind = "text"; }
         else if (type == CellValues.Boolean) { kind = "boolean"; }
@@ -148,6 +139,27 @@ internal static class FileContextWorkbookReader
         else if (type == CellValues.Date) { kind = "date"; }
         else if (value.Length == 0) { kind = "blank"; }
         return new(address, kind, value, cell.CellFormula?.Text);
+    }
+
+    internal static string ReadCellValue(Cell cell, string[] strings, CellValues? type)
+    {
+        if (type == CellValues.InlineString) { return ReadBaseText(cell.InlineString); }
+        var value = cell.CellValue?.Text ?? string.Empty;
+        if (type != CellValues.SharedString) { return value; }
+        if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var index) || index < 0 || index >= strings.Length)
+        { throw new InvalidDataException("Workbook cell contains an invalid shared-string reference."); }
+        return strings[index];
+    }
+
+    internal static string[] ReadSharedStrings(WorkbookPart workbook) =>
+        workbook.SharedStringTablePart?.SharedStringTable?.Elements<SharedStringItem>().Select(ReadBaseText).ToArray() ?? [];
+
+    private static string ReadBaseText(RstType? value)
+    {
+        if (value is null) { return string.Empty; }
+        if (value.FirstChild is Text text && ReferenceEquals(text, value.LastChild)) { return text.Text; }
+        return string.Concat(value.Descendants<Text>()
+            .Where(static text => text.Parent is not PhoneticRun).Select(static text => text.Text));
     }
 
     private static WorkbookPart RequireWorkbook(SpreadsheetDocument document) =>

@@ -1,22 +1,38 @@
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
+using Vml = DocumentFormat.OpenXml.Vml;
 
 namespace ManagedCode.FileContext.Tests;
 
 internal static class FileContextDocxTestFiles
 {
     public static byte[] WithParagraphs(params string[] texts)
+        => WithBody(new Body(texts.Select(ParagraphWithText)));
+
+    public static byte[] WithInlineSeparators()
+    {
+        var body = new Body();
+        body.AppendChild(new Paragraph()).AppendChild(new Run(
+            new Text("A"), new TabChar(), new Text("B"), new Break(), new Text("C"), new CarriageReturn(), new Text("D")));
+        return WithBody(body);
+    }
+
+    public static byte[] WithTextBox()
+    {
+        var outer = ParagraphWithText("Outer ");
+        var picture = outer.AppendChild(new Run()).AppendChild(new Picture());
+        var box = picture.AppendChild(new Vml.Shape()).AppendChild(new Vml.TextBox());
+        box.AppendChild(new TextBoxContent()).AppendChild(ParagraphWithText("boxed"));
+        return WithBody(new Body(outer, ParagraphWithText("Second"), ParagraphWithText("Third")));
+    }
+
+    private static byte[] WithBody(Body body)
     {
         using var stream = new MemoryStream();
         using (var package = WordprocessingDocument.Create(stream, WordprocessingDocumentType.Document))
         {
             var main = package.AddMainDocumentPart();
-            var body = new Body();
-            foreach (var text in texts)
-            {
-                body.AppendChild(ParagraphWithText(text));
-            }
             var document = new Document();
             document.AppendChild(body);
             main.Document = document;

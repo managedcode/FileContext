@@ -9,6 +9,7 @@ namespace ManagedCode.FileContext;
 internal static class ReportCanvas
 {
     private const float BoldStrokeWidth = .35f;
+    private const int SingleMeasurementLength = 256;
     private static readonly Lazy<SKTypeface> Typeface = new(() =>
     {
         using var stream = typeof(ReportCanvas).Assembly.GetManifestResourceStream(
@@ -54,6 +55,12 @@ internal static class ReportCanvas
         var lines = new List<string>();
         foreach (var paragraph in value.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n'))
         {
+            if (paragraph.Length <= SingleMeasurementLength && Ascii.IsValid(paragraph) && MeasureText(paragraph, paint) <= width)
+            {
+                lines.Add(paragraph);
+                continue;
+            }
+
             var start = 0;
             var position = 0;
             foreach (var rune in paragraph.EnumerateRunes())

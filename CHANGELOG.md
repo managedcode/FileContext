@@ -2,6 +2,14 @@
 
 All notable changes to ManagedCode.FileContext are documented here.
 
+## 1.0.19
+
+- Apply file, result, page, concurrency, and timeout limits only when explicitly configured or requested. Default text and document reads return the remaining content.
+- Inspect CSV records without materializing non-header values. Preserve quoted multiline fields, blank lines, and trailing tab-delimited columns.
+- Preserve DOCX tabs, line breaks, and continuation offsets. Return XLSX base cell text without phonetic annotations.
+- Reduce allocations during file search and XLSX inspection. Reuse report text styles and index table highlights once per table.
+- Paginate long PDF headings and KPI rows. Check configured output budgets before uploading generated files.
+
 ## 1.0.17
 
 - Update deterministic agent integration dependencies and APIs to `ManagedCode.LlmTestServer` 1.0.0.

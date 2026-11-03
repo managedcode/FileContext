@@ -8,16 +8,19 @@ public sealed partial class FileContextDocumentService(ManagedCodeStorageFileSto
     public Task<FileContextCreatedFile> CreateTextAsync(string fileName, string text, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(text);
-        return CreateAsync(fileName, "text/plain; charset=utf-8", _ =>
+        return CreateAsync(fileName, "text/plain; charset=utf-8", (limit, _) =>
         {
-            StorageFileCreator.EnsureWithinLimit(Encoding.UTF8.GetByteCount(text), options.MaximumGeneratedFileBytes);
-            return Encoding.UTF8.GetBytes(text);
+            if (limit != long.MaxValue)
+            {
+                StorageFileCreator.EnsureWithinLimit(Encoding.UTF8.GetByteCount(text), limit);
+            }
+            return new MemoryStream(Encoding.UTF8.GetBytes(text), writable: false);
         }, cancellationToken);
     }
 
     public Task<FileContextCreatedFile> CreateCsvAsync(string fileName, FileContextCsvDocument document, CancellationToken cancellationToken = default) =>
         CreateAsync(RequireExtension(fileName, ".csv"), "text/csv; charset=utf-8",
-            token => FileContextCsvWriter.Create(document, token), cancellationToken);
+            (limit, token) => FileContextCsvWriter.Create(document, limit, token), cancellationToken);
 
     public async Task<FileContextCreatedFile> CreateWorkbookAsync(string fileName, FileContextWorkbook workbook, CancellationToken cancellationToken = default)
     {
@@ -41,19 +44,19 @@ public sealed partial class FileContextDocumentService(ManagedCodeStorageFileSto
 
     public Task<FileContextCreatedFile> CreatePdfAsync(string fileName, FileContextPdfDocument document, CancellationToken cancellationToken = default) =>
         CreateAsync(RequireExtension(fileName, ".pdf"), "application/pdf",
-            token => FileContextPdfWriter.Create(document, token), cancellationToken);
+            (_, token) => new MemoryStream(FileContextPdfWriter.Create(document, token), writable: false), cancellationToken);
 
     private Task<FileContextCreatedFile> CreateAsync(string fileName, string mediaType,
-        Func<CancellationToken, byte[]> generate, CancellationToken cancellationToken)
+        Func<long, CancellationToken, MemoryStream> generate, CancellationToken cancellationToken)
     {
         options.Validate();
         if (!options.EnableWriteTools) { throw new InvalidOperationException("Document creation requires EnableWriteTools."); }
         var normalized = StoragePathScope.Normalize(fileName);
         return FileContextOperation.RunAsync(options.OperationTimeout, async token =>
         {
-            var bytes = generate(token);
-            using var content = new MemoryStream(bytes, writable: false);
-            return await store.CreatePreparedFileAsync(normalized, content, mediaType, options.MaximumGeneratedFileBytes, token).ConfigureAwait(false);
+            var limit = store.GetGeneratedFileLimit(options.MaximumGeneratedFileBytes);
+            using var content = generate(limit, token);
+            return await store.CreatePreparedFileAsync(normalized, content, mediaType, limit, token).ConfigureAwait(false);
         }, cancellationToken);
     }
 
@@ -73,8 +76,7 @@ public sealed partial class FileContextDocumentService(ManagedCodeStorageFileSto
         options.Validate();
         if (!options.EnableWriteTools) { throw new InvalidOperationException("Document creation requires EnableWriteTools."); }
         var limit = store.GetGeneratedFileLimit(options.MaximumGeneratedFileBytes);
-        var timeout = options.OperationTimeout ?? TimeSpan.FromSeconds(FileContextDefaults.ReportTimeoutSeconds);
-        return await FileContextOperation.RunAsync(timeout, async token =>
+        return await FileContextOperation.RunAsync(options.OperationTimeout, async token =>
         {
             var outputs = FileContextReportRenderer.Render(report, options, limit, token);
             var files = new List<FileContextCreatedFile>(outputs.Count);

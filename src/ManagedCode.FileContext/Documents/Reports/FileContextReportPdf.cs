@@ -2,6 +2,7 @@
 #pragma warning disable S109, MA0015
 using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using SkiaSharp;
 
 namespace ManagedCode.FileContext;
@@ -114,29 +115,36 @@ internal sealed class FileContextReportPdf : IDisposable
         var titleLines = ReportCanvas.Wrap(ReportJson.Text(content, "title"), title, pageWidth - Margin * 2);
         var subtitleLines = ReportCanvas.Wrap(ReportJson.Text(content, "subtitle"), subtitle, pageWidth - Margin * 2);
         var height = titleLines.Count * 29 + subtitleLines.Count * 17 + 18;
-        Ensure(height);
+        if (height <= Bottom - ContentTop) { Ensure(height); }
         foreach (var line in titleLines)
         {
+            token.ThrowIfCancellationRequested();
+            Ensure(29);
             ReportCanvas.Text(canvas, line, Margin, Y + 22, title);
             Y += 29;
         }
         foreach (var line in subtitleLines)
         {
+            token.ThrowIfCancellationRequested();
+            Ensure(17);
             ReportCanvas.Text(canvas, line, Margin, Y + 12, subtitle);
             Y += 17;
         }
         Y += 18;
     }
 
+    private static readonly Regex ReportLinks = new(@"\[(?<label>[^\]]+)\]\((?<url>https://[^\s)]+)\)",
+        RegexOptions.ExplicitCapture | RegexOptions.NonBacktracking, Regex.InfiniteMatchTimeout);
+
     private void DrawText(JsonElement content)
     {
         var source = ReportJson.Text(content, "text");
-        source = System.Text.RegularExpressions.Regex.Replace(source,
-            @"\[(?<label>[^\]]+)\]\((?<url>https://[^\s)]+)\)", "${label} (${url})",
-            System.Text.RegularExpressions.RegexOptions.ExplicitCapture, TimeSpan.FromSeconds(1));
+        source = ReportLinks.Replace(source, "${label} (${url})");
         source = string.Join('\n', source.Split('\n').Select(line =>
             line.StartsWith("- ", StringComparison.Ordinal) ? "• " + line[2..] : line));
-        using var paint = ReportCanvas.Paint(ReportCanvas.Parse(theme.Text), 10);
+        var color = ReportCanvas.Parse(theme.Text);
+        using var paint = ReportCanvas.Paint(color, 10);
+        using var boldPaint = ReportCanvas.Paint(color, 10, bold: true);
         var lines = ReportCanvas.Wrap(source, paint, pageWidth - Margin * 2);
         foreach (var line in lines)
         {
@@ -145,7 +153,7 @@ internal sealed class FileContextReportPdf : IDisposable
             var segments = line.Split("**", StringSplitOptions.None);
             for (var index = 0; index < segments.Length; index++)
             {
-                using var segmentPaint = ReportCanvas.Paint(ReportCanvas.Parse(theme.Text), 10, bold: index % 2 == 1);
+                var segmentPaint = index % 2 == 1 ? boldPaint : paint;
                 ReportCanvas.Text(canvas, segments[index], x, Y + 12, segmentPaint);
                 x += ReportCanvas.MeasureText(segments[index], segmentPaint);
             }

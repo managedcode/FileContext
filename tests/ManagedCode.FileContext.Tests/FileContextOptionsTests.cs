@@ -22,7 +22,7 @@ public sealed class FileContextOptionsTests
         options.MaximumSearchFileBytes.ShouldBe(FileContextDefaults.MaximumSearchFileBytes);
         options.MaximumSearchResults.ShouldBe(FileContextDefaults.MaximumSearchResults);
         options.MaximumMatchesPerFile.ShouldBe(FileContextDefaults.MaximumMatchesPerFile);
-        options.RegexTimeout.ShouldBe(TimeSpan.FromSeconds(FileContextDefaults.RegexTimeoutSeconds));
+        options.RegexTimeout.ShouldBe(System.Text.RegularExpressions.Regex.InfiniteMatchTimeout);
         options.MarkdownGlob.ShouldBe(FileContextDefaults.MarkdownGlob);
         options.MaximumMarkdownFiles.ShouldBe(FileContextDefaults.MaximumMarkdownFiles);
         options.MaximumMarkdownSourceBytes.ShouldBe(FileContextDefaults.MaximumMarkdownSourceBytes);
@@ -48,7 +48,8 @@ public sealed class FileContextOptionsTests
         await using var scope = await TestStorageScope.CreateAsync();
         var options = new FileContextOptions
         {
-            DefaultRangeLineCount = FileContextDefaults.MaximumRangeLineCount + 1,
+            MaximumRangeLineCount = 1,
+            DefaultRangeLineCount = 2,
         };
 
         Should.Throw<InvalidOperationException>(() => new ManagedCodeStorageFileStore(scope.Storage, options));
@@ -61,5 +62,13 @@ public sealed class FileContextOptionsTests
         var options = new FileContextOptions { RegexTimeout = TimeSpan.Zero };
 
         Should.Throw<InvalidOperationException>(() => new ManagedCodeStorageFileStore(scope.Storage, options));
+    }
+
+    [Fact]
+    public async Task Construction_rejects_an_invalid_explicit_docx_or_openxml_limit()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        Should.Throw<InvalidOperationException>(() => new ManagedCodeStorageFileStore(scope.Storage, new() { MaximumDocxTextCharacters = 1 }));
+        Should.Throw<InvalidOperationException>(() => new ManagedCodeStorageFileStore(scope.Storage, new() { MaximumOpenXmlPartCharacters = -1 }));
     }
 }

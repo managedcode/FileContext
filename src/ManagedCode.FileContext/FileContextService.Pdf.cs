@@ -11,10 +11,7 @@ public sealed partial class FileContextService
         int maxCharacters = FileContextDefaults.MaximumPdfTextCharacters,
         CancellationToken cancellationToken = default)
     {
-        if (maxCharacters is < 1 or > FileContextDefaults.MaximumPdfTextCharacters)
-        {
-            throw new ArgumentOutOfRangeException(nameof(maxCharacters));
-        }
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxCharacters, 1);
         return FileContextOperation.RunAsync(_options.OperationTimeout, async token =>
         {
             using var permit = await _pdfProcessor.AcquireAsync(token).ConfigureAwait(false);
@@ -67,7 +64,7 @@ public sealed partial class FileContextService
         }
         var metadata = await _fileStore.GetMetadataAsync(path, cancellationToken).ConfigureAwait(false)
             ?? throw new FileNotFoundException($"File '{path}' was not found.", path);
-        if (metadata.Length > (ulong)_options.MaximumPdfReadBytes)
+        if (metadata.Length > (ulong)_options.PdfSourceReadBudget)
         {
             throw new IOException("The PDF exceeds the read limit.");
         }

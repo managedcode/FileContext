@@ -16,7 +16,7 @@ public sealed class LargeFileIntegrationTests
     {
         await using var scope = await TestStorageScope.CreateAsync();
         await CreateSparseFileAsync(Path.Combine(scope.Directory, LargeFileName));
-        var options = new FileContextOptions { MaximumRangeReadBytes = RangeByteLimit };
+        var options = new FileContextOptions { MaximumRangeReadBytes = RangeByteLimit, MaximumFullReadBytes = RangeByteLimit };
         var store = new ManagedCodeStorageFileStore(scope.Storage, options);
         var service = new FileContextService(store, options);
 
