@@ -16,14 +16,14 @@ In scope: standard file access, bounded line navigation, metadata, native PDF/DO
 6. Full reads fail before allocation when metadata exceeds `MaximumFullReadBytes`. Decoded UTF-8 limits retain encoder state across buffer boundaries, including split surrogate pairs.
 7. Range reads are 1-based by line, stream sequentially, return continuation metadata, and stop at configured line/byte limits.
 8. Content search is case-insensitive regular expression search with a timeout, file/match/result limits, and optional standard glob filtering.
-9. Directory listing returns direct child directories before direct child files and does not leak the configured storage prefix.
-10. Markdown graph builds include only selected `.md` files within configured limits and use `ManagedCode.MarkdownLd.Kb`.
+9. Directory listing returns direct child directories before direct child files and keeps the storage prefix private. A listing with more than `MaximumDirectoryEntries` distinct children fails with a limit error. The default is 1,000.
+10. Markdown graph builds include only `.md` and `.markdown` files that match the configured glob and limits. The default glob selects `.md` files. Builds use `ManagedCode.MarkdownLd.Kb`.
 11. Graph search returns package-owned match records; graph export supports JSON-LD, Turtle, Mermaid, and DOT with an output limit.
 12. Each graph operation builds from the current selected storage contents, so graph results cannot become stale between calls.
 13. The context provider injects capability instructions and tools, not arbitrary file content as system instructions.
 14. DI supports both the default `IStorage` and a named/keyed `IStorage` registration.
 15. Optional `OperationTimeout` applies to each public storage/context operation, combining with caller cancellation and preserving one deadline across internal steps. It defaults to null; regex matching has its separate `RegexTimeout`.
-16. The NuGet package has version `1.0.9`; publication occurs only from the GitHub Actions release workflow.
+16. The GitHub Actions release workflow publishes the NuGet version defined in `Directory.Build.props`.
 
 ## Main flow
 
@@ -87,7 +87,7 @@ Independent writes and range reads on eight different files are tested concurren
 9. A real Agent Framework loop receives an LlmTestServer tool call, executes storage-backed `file_access_read`, proves the file content reaches the second model request, and returns the expected final answer.
 10. LlmTestServer tool loops exercise every read-only, mutation, and extended tool against the real filesystem provider.
 11. A sparse 1 GiB file supports bounded repeated range reads without proportional allocation; a giant unterminated line fails at the configured byte boundary.
-12. The packed `1.0.9` package installs and runs in a clean smoke project.
+12. The published package installs and runs in a clean smoke project.
 
 ## Definition of done
 
@@ -127,6 +127,8 @@ text from the scoped `.docx` package in bounded windows. Each result includes th
 and character offset when more text remains, so an agent can continue without loading a long
 document into one model call. The tool does not execute macros, fetch external links, or perform
 OCR on embedded images. Generic text reads refuse DOCX, and text search skips it.
+XLSX and DOCX reads also enforce `MaximumOpenXmlPartCharacters` per decompressed XML part.
+The default is 32 Mi characters.
 
 `file_context_pdf_text` reports a bounded text-layer prefix, total page count, and one-based pages with almost no text. It performs no OCR. `file_context_pdf_page_image` renders a complete page as PNG. `file_context_pdf_images_info` counts embedded image objects, and `file_context_pdf_image` returns one object as PNG. The direct `IFileContextPdf` methods and public byte-oriented PDF APIs support the same operations. Storage-scoped PDF reads enforce a byte cap; page rendering enforces pixel and image-byte caps. Image tools return `DataContent`; host chat pipelines must forward it as image content rather than stringify a function result.
 
@@ -136,7 +138,8 @@ OCR on embedded images. Generic text reads refuse DOCX, and text search skips it
 `.xlsx` in the same authorized storage scope. Each supplied sheet replaces that
 sheet's cell values/formulas, inherits existing cell styles by Excel coordinates,
 and keeps its layout and other package parts; sheets not supplied are retained.
-The template is never modified. A new unique output file is created.
+The template is never modified. Its source is bounded by `MaximumFullReadBytes` and
+`MaximumOpenXmlPartCharacters`. A new unique output file is created.
 
 Each worksheet has an optional `Style` object: `BoldHeader`, `HeaderFill` (`#RRGGBB`),
 `FreezeHeader`, `NumberFormats` and `ColumnWidths`. Dictionary keys are one-based

@@ -1,6 +1,8 @@
 using System.IO.Compression;
 using System.Text;
 using System.Xml.Linq;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.Extensions.AI;
 
 namespace ManagedCode.FileContext.Tests;
@@ -85,6 +87,42 @@ public sealed class WorkbookReadingTests
         var matches = await store.SearchAsync("", ".", recursive: true);
         matches.Select(match => match.FileName).ShouldBe([text.Path]);
         (await context.Documents.ReadWorkbookRangeAsync(workbook.Path, "Data", 1, 1, 1, 1)).Cells[0].Value.ShouldBe("source value");
+    }
+
+    [Fact]
+    public async Task Workbook_info_preserves_chart_sheet_names_without_reading_them_as_worksheets()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { EnableWriteTools = true };
+        var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
+        var created = await context.Documents.CreateWorkbookAsync("chart.xlsx", new([new("Data", [[new(Number: 42)]])]));
+        using (var document = SpreadsheetDocument.Open(Path.Combine(scope.Directory, created.Path), true))
+        {
+            var workbook = document.WorkbookPart!;
+            workbook.WorksheetParts.Single().Worksheet!.PrependChild(new SheetDimension { Reference = "A1" });
+            var chart = workbook.AddNewPart<ChartsheetPart>();
+            chart.Chartsheet = new Chartsheet();
+            workbook.Workbook!.Sheets!.AppendChild(new Sheet { Id = workbook.GetIdOfPart(chart), SheetId = 2, Name = "Chart" });
+        }
+
+        var info = await context.Documents.GetWorkbookInfoAsync(created.Path);
+        info.Sheets.Select(static sheet => sheet.Name).ShouldBe(["Data", "Chart"]);
+        info.Sheets[0].Dimension.ShouldBe("A1");
+        info.Sheets[1].Dimension.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Workbook_range_and_table_inspection_enforce_decompressed_part_limit()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { EnableWriteTools = true, MaximumOpenXmlPartCharacters = 2_048 };
+        var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
+        var created = await context.Documents.CreateWorkbookAsync("large-part.xlsx",
+            new([new("Data", [[new(Text: new string('x', 8_192))]])]));
+
+        await Should.ThrowAsync<System.Xml.XmlException>(() =>
+            context.Documents.ReadWorkbookRangeAsync(created.Path, "Data", 1, 1, 1, 1));
+        await Should.ThrowAsync<System.Xml.XmlException>(() => context.Documents.GetTablesInfoAsync(created.Path));
     }
 
     private static void Rewrite(TestStorageScope scope, FileContextOptions options, string path)

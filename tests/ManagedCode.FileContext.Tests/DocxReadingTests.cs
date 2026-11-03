@@ -59,6 +59,8 @@ public sealed class DocxReadingTests
         await Should.ThrowAsync<ArgumentException>(() => context.Documents.ReadDocxTextAsync("other.pdf"));
         await Should.ThrowAsync<ArgumentOutOfRangeException>(() => context.Documents.ReadDocxTextAsync(PathInScope, paragraphCount: 0));
         await Should.ThrowAsync<InvalidOperationException>(() => store.ReadAsync(PathInScope));
+        await Should.ThrowAsync<InvalidOperationException>(() => store.ReadAsync($" {PathInScope} "));
+        await Should.ThrowAsync<InvalidOperationException>(() => store.ReadAsync($"{PathInScope}/"));
         await Should.ThrowAsync<InvalidOperationException>(() => context.ReadRangeAsync(PathInScope));
         (await store.SearchAsync("", ".", recursive: true)).ShouldBeEmpty();
 
@@ -67,6 +69,37 @@ public sealed class DocxReadingTests
         var other = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage,
             new FileContextOptions { RootPrefix = "other" }));
         await Should.ThrowAsync<FileNotFoundException>(() => other.Documents.ReadDocxTextAsync(PathInScope));
+    }
+
+    [Fact]
+    public async Task Docx_cursor_resumes_before_a_split_emoji_and_rejects_a_mid_pair_offset()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { RootPrefix = "chat" };
+        var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
+        var prefix = new string('x', FileContextDefaults.MaximumDocxTextCharacters - 1);
+        await UploadAsync(scope, FileContextDocxTestFiles.WithParagraphs(prefix + "😀tail"));
+
+        var first = await context.Documents.ReadDocxTextAsync(PathInScope);
+        first.Paragraphs.Single().Text.ShouldBe(prefix);
+        first.NextCharacter.ShouldBe(prefix.Length);
+        var second = await context.Documents.ReadDocxTextAsync(PathInScope, first.NextParagraph!.Value, first.NextCharacter);
+        second.Paragraphs.Single().Text.ShouldBe("😀tail");
+        await Should.ThrowAsync<ArgumentOutOfRangeException>(() =>
+            context.Documents.ReadDocxTextAsync(PathInScope, startCharacter: prefix.Length + 1));
+    }
+
+    [Fact]
+    public async Task Docx_reader_rejects_an_oversized_decompressed_part()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { RootPrefix = "chat", MaximumOpenXmlPartCharacters = 2_048 };
+        var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
+        var bytes = FileContextDocxTestFiles.WithParagraphs(new string('x', 8_192));
+        bytes.Length.ShouldBeLessThan(2_048);
+        await UploadAsync(scope, bytes);
+
+        await Should.ThrowAsync<System.Xml.XmlException>(() => context.Documents.ReadDocxTextAsync(PathInScope));
     }
 
     private static async Task UploadAsync(TestStorageScope scope, byte[] content)

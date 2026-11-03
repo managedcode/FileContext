@@ -4,7 +4,7 @@
     <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup>
-    <GlobalPackageReference Include="Meziantou.Analyzer" Version="3.0.296" PrivateAssets="all" />
+    <GlobalPackageReference Include="Meziantou.Analyzer" Version="3.0.320" PrivateAssets="all" />
     <GlobalPackageReference Include="Roslynator.Analyzers" Version="5.0.1" PrivateAssets="all" />
     <GlobalPackageReference Include="SonarAnalyzer.CSharp" Version="10.35.0.4138" PrivateAssets="all" />
   </ItemGroup>
@@ -12,19 +12,19 @@
     <PackageVersion Include="DocumentFormat.OpenXml" Version="3.5.1" />
     <PackageVersion Include="PdfPig" Version="0.1.16" />
     <PackageVersion Include="PdfPig.Rendering.Skia" Version="0.1.16.7" />
-    <PackageVersion Include="SkiaSharp" Version="4.153.1" />
-    <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.153.1" />
+    <PackageVersion Include="SkiaSharp" Version="4.154.0" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.154.0" />
     <PackageVersion Include="coverlet.collector" Version="10.1.0" />
     <PackageVersion Include="coverlet.msbuild" Version="10.1.0" />
     <PackageVersion Include="DotNet.ReproducibleBuilds" Version="2.0.5" />
-    <PackageVersion Include="ManagedCode.LlmTestServer" Version="1.0.5" />
-    <PackageVersion Include="ManagedCode.LlmTestServer.Client" Version="1.0.5" />
-    <PackageVersion Include="ManagedCode.LlmTestServer.Hosting" Version="1.0.5" />
-    <PackageVersion Include="ManagedCode.LlmTestServer.OpenAI" Version="1.0.5" />
-    <PackageVersion Include="ManagedCode.MarkdownLd.Kb" Version="0.2.18" />
-    <PackageVersion Include="ManagedCode.Storage.Core" Version="10.1.6" />
-    <PackageVersion Include="ManagedCode.Storage.FileSystem" Version="10.1.6" />
-    <PackageVersion Include="Microsoft.Agents.AI" Version="1.26.0" />
+    <PackageVersion Include="ManagedCode.LlmTestServer" Version="1.0.6" />
+    <PackageVersion Include="ManagedCode.LlmTestServer.Client" Version="1.0.6" />
+    <PackageVersion Include="ManagedCode.LlmTestServer.Hosting" Version="1.0.6" />
+    <PackageVersion Include="ManagedCode.LlmTestServer.OpenAI" Version="1.0.6" />
+    <PackageVersion Include="ManagedCode.MarkdownLd.Kb" Version="0.3.3" />
+    <PackageVersion Include="ManagedCode.Storage.Core" Version="10.1.10" />
+    <PackageVersion Include="ManagedCode.Storage.FileSystem" Version="10.1.10" />
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.27.0" />
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.11.0" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.14" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />

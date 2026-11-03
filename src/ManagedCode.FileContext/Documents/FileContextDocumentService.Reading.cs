@@ -5,7 +5,7 @@ namespace ManagedCode.FileContext;
 public sealed partial class FileContextDocumentService
 {
     public Task<FileContextWorkbookInfo> GetWorkbookInfoAsync(string path, CancellationToken cancellationToken = default) =>
-        ReadWorkbookAsync(path, (document, _) => FileContextWorkbookReader.Inspect(document, path), cancellationToken);
+        ReadWorkbookAsync(path, (document, token) => FileContextWorkbookReader.Inspect(document, path, token), cancellationToken);
 
     public Task<FileContextWorkbookRange> ReadWorkbookRangeAsync(string path, string sheet, int startRow, int rowCount,
         int startColumn, int columnCount, CancellationToken cancellationToken = default)
@@ -21,7 +21,8 @@ public sealed partial class FileContextDocumentService
         RequireExtension(path, ".xlsx");
         return ReadSourceAsync(path, (buffer, token) =>
         {
-            using var document = SpreadsheetDocument.Open(buffer, false);
+            using var document = SpreadsheetDocument.Open(buffer, false,
+                new OpenSettings { MaxCharactersInPart = options.MaximumOpenXmlPartCharacters });
             return read(document, token);
         }, options.MaximumFullReadBytes, cancellationToken);
     }
@@ -30,23 +31,22 @@ public sealed partial class FileContextDocumentService
         long maximumBytes, CancellationToken cancellationToken) =>
         FileContextOperation.RunAsync(options.OperationTimeout, async token =>
         {
-            var metadata = await store.GetMetadataAsync(path, token).ConfigureAwait(false)
-                ?? throw new FileNotFoundException("The document was not found in this file context.", path);
-            if (metadata.Length > (ulong)maximumBytes)
-            { throw new IOException("Document exceeds the configured source read budget."); }
-            var source = await store.OpenReadAsync(path, token).ConfigureAwait(false);
-            await using var lifetime = source.ConfigureAwait(false);
             using var buffer = new MemoryStream();
-            var chunk = new byte[81920];
-            int count;
-            while ((count = await source.ReadAsync(chunk, token).ConfigureAwait(false)) > 0)
-            {
-                if (buffer.Length + count > maximumBytes)
-                { throw new IOException("Document exceeds the configured source read budget."); }
-                buffer.Write(chunk, 0, count);
-            }
-            buffer.Position = 0;
+            await CopyScopedSourceAsync(path, buffer, maximumBytes, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             return read(buffer, token);
         }, cancellationToken);
+
+    private async Task CopyScopedSourceAsync(string path, MemoryStream buffer, long maximumBytes, CancellationToken token)
+    {
+        var metadata = await store.GetMetadataAsync(path, token).ConfigureAwait(false)
+            ?? throw new FileNotFoundException("The document was not found in this file context.", path);
+        if (metadata.Length > (ulong)maximumBytes)
+        { throw new IOException("Document exceeds the configured source read budget."); }
+        var source = await store.OpenReadInOperationAsync(path, token).ConfigureAwait(false);
+        await using var lifetime = source.ConfigureAwait(false);
+        using var bounded = new StorageReadBudgetStream(source, maximumBytes);
+        await bounded.CopyToAsync(buffer, StorageReadBudgetStream.DefaultCopyBufferSize, token).ConfigureAwait(false);
+        buffer.Position = 0;
+    }
 }

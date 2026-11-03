@@ -85,7 +85,7 @@ public static class FileContextPdfTextExtractor
             Exception? pageFailure;
             try
             {
-                page = FileContextPdfPageReader.Read(document.GetPage(number), maxRetainedChars);
+                page = FileContextPdfPageReader.Read(document.GetPage(number), maxRetainedChars - text.Length);
                 pageFailure = null;
             }
             catch (Exception exception) when (exception is not OutOfMemoryException)
@@ -123,10 +123,15 @@ public static class FileContextPdfTextExtractor
             return false;
         }
 
-        var addition = text.Length == 0 ? pageText : PageSeparator + pageText;
-        var room = Math.Max(0, maxRetainedChars - text.Length);
-        text.Append(addition, 0, Math.Min(room, addition.Length));
-        return addition.Length > room;
+        var room = maxRetainedChars - text.Length;
+        if (text.Length > 0)
+        {
+            var separatorLength = Math.Min(room, PageSeparator.Length);
+            text.Append(PageSeparator, 0, separatorLength);
+            room -= separatorLength;
+        }
+        text.Append(pageText, 0, Math.Min(room, pageText.Length));
+        return pageText.Length > room;
     }
 
     internal static bool HasTextLayer(string text) =>

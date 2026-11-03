@@ -30,6 +30,21 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
                 Math.Min(maximumBytes ?? _options.MaximumGeneratedFileBytes, _options.MaximumGeneratedFileBytes), token), cancellationToken);
     }
 
+    internal Task<FileContextCreatedFile> CreatePreparedFileAsync(string fileName, MemoryStream content, string mediaType,
+        long maximumBytes, CancellationToken cancellationToken)
+    {
+        var limit = GetGeneratedFileLimit(maximumBytes);
+        return FileContextOperation.RunAsync(_options.OperationTimeout,
+            token => new StorageFileCreator(_storage, _paths).CreatePreparedAsync(fileName, content, mediaType,
+                limit, token), cancellationToken);
+    }
+
+    internal long GetGeneratedFileLimit(long maximumBytes)
+    {
+        if (!_options.EnableWriteTools) { throw new InvalidOperationException("File creation requires EnableWriteTools."); }
+        return Math.Min(maximumBytes, _options.MaximumGeneratedFileBytes);
+    }
+
     public override Task WriteAsync(string path, string content, CancellationToken cancellationToken = default)
         => FileContextOperation.RunAsync(_options.OperationTimeout, token => WriteOperationAsync(path, content, token), cancellationToken);
 
@@ -66,7 +81,7 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
     private async Task<string?> ReadOperationAsync(string path, CancellationToken cancellationToken = default)
     {
         var storagePath = _paths.ToStoragePath(path);
-        StorageTextPolicy.RequireText(path);
+        StorageTextPolicy.RequireText(storagePath);
         if (!await ExistsCoreAsync(storagePath, cancellationToken).ConfigureAwait(false))
         {
             return null;
@@ -81,7 +96,8 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
         var stream = await OpenReadCoreAsync(storagePath, cancellationToken).ConfigureAwait(false);
         await using (stream.ConfigureAwait(false))
         {
-            return await StorageTextReader.ReadAsync(stream, _options.MaximumFullReadBytes, cancellationToken).ConfigureAwait(false);
+            using var bounded = new StorageReadBudgetStream(stream, _options.MaximumFullReadBytes);
+            return await StorageTextReader.ReadAsync(bounded, _options.MaximumFullReadBytes, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -93,35 +109,13 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
         return result.Value;
     }
 
-    private async Task<IReadOnlyList<FileStoreEntry>> ListChildrenOperationAsync(
+    private Task<IReadOnlyList<FileStoreEntry>> ListChildrenOperationAsync(
         string directory,
         CancellationToken cancellationToken = default)
     {
         var normalizedDirectory = StoragePathScope.Normalize(directory, allowEmpty: true);
-        var storageDirectory = _paths.ToStoragePath(normalizedDirectory, allowEmpty: true);
-        var children = new Dictionary<string, string>(StringComparer.Ordinal);
-
-        await foreach (var metadata in _storage.GetBlobMetadataListAsync(storageDirectory, cancellationToken).ConfigureAwait(false))
-        {
-            var scopedPath = _paths.FromStoragePath(metadata.FullName);
-            if (scopedPath is null || !StoragePathScope.TryGetRemainder(scopedPath, normalizedDirectory, out var remainder))
-            {
-                continue;
-            }
-
-            var separatorIndex = remainder.IndexOf('/', StringComparison.Ordinal);
-            var name = separatorIndex < 0 ? remainder : remainder[..separatorIndex];
-            if (separatorIndex >= 0 || !children.ContainsKey(name))
-            {
-                children[name] = separatorIndex < 0 ? FileStoreEntry.File : FileStoreEntry.Directory;
-            }
-        }
-
-        return children
-            .OrderBy(static pair => pair.Value, StringComparer.Ordinal)
-            .ThenBy(static pair => pair.Key, StringComparer.Ordinal)
-            .Select(static pair => new FileStoreEntry(pair.Key, pair.Value))
-            .ToArray();
+        return StorageDirectoryListing.ReadAsync(EnumerateScopedFilesAsync(normalizedDirectory, cancellationToken),
+            normalizedDirectory, _options.MaximumDirectoryEntries, cancellationToken);
     }
 
     private Task<bool> FileExistsOperationAsync(string path, CancellationToken cancellationToken = default)
@@ -145,10 +139,13 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
         return Task.CompletedTask;
     }
 
-    public async Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
-    {
-        return await OpenReadCoreAsync(_paths.ToStoragePath(path), cancellationToken).ConfigureAwait(false);
-    }
+    /// <summary>Opens a scoped stream owned by the caller. The deadline covers opening the stream.</summary>
+    public Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default) =>
+        FileContextOperation.RunAsync(_options.OperationTimeout, token => OpenReadInOperationAsync(path, token),
+            cancellationToken, static stream => stream.DisposeAsync());
+
+    internal Task<Stream> OpenReadInOperationAsync(string path, CancellationToken cancellationToken) =>
+        OpenReadCoreAsync(_paths.ToStoragePath(path), cancellationToken);
 
     internal async Task<BlobMetadata?> GetMetadataAsync(string path, CancellationToken cancellationToken)
     {
@@ -158,22 +155,20 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
             : null;
     }
 
-    internal async IAsyncEnumerable<BlobMetadata> EnumerateScopedFilesAsync(
+    internal async IAsyncEnumerable<(string Path, BlobMetadata Metadata)> EnumerateScopedFilesAsync(
         string directory,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var storageDirectory = _paths.ToStoragePath(directory, allowEmpty: true);
         await foreach (var metadata in _storage.GetBlobMetadataListAsync(storageDirectory, cancellationToken).ConfigureAwait(false))
         {
-            if (_paths.FromStoragePath(metadata.FullName) is not null)
+            var path = _paths.FromStoragePath(metadata.FullName);
+            if (path is not null && StoragePathScope.IsDescendant(path, directory))
             {
-                yield return metadata;
+                yield return (path, metadata);
             }
         }
     }
-
-    internal string ToScopedPath(string storagePath) => _paths.FromStoragePath(storagePath)
-        ?? throw new InvalidOperationException("The storage item is outside the configured root.");
 
     private async Task<bool> ExistsCoreAsync(string storagePath, CancellationToken cancellationToken)
     {

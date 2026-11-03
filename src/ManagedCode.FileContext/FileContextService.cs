@@ -62,7 +62,7 @@ public sealed partial class FileContextService : IFileContext, IFileContextPdf
             throw new FileNotFoundException($"File '{path}' was not found.", path);
         }
 
-        var stream = await _fileStore.OpenReadAsync(path, cancellationToken).ConfigureAwait(false);
+        var stream = await _fileStore.OpenReadInOperationAsync(path, cancellationToken).ConfigureAwait(false);
         await using (stream.ConfigureAwait(false))
         {
             using var reader = new StreamReader(stream, leaveOpen: true);
@@ -108,23 +108,29 @@ public sealed partial class FileContextService : IFileContext, IFileContextPdf
         string directory = "",
         CancellationToken cancellationToken = default)
     {
-        var (build, documentCount) = await BuildMarkdownGraphAsync(directory, cancellationToken).ConfigureAwait(false);
-        var content = format switch
+        Func<KnowledgeGraph, string> serialize = format switch
         {
-            MarkdownGraphFormat.Mermaid => build.Graph.SerializeMermaidFlowchart(),
-            MarkdownGraphFormat.Dot => build.Graph.SerializeDotGraph(),
-            MarkdownGraphFormat.Turtle => build.Graph.SerializeTurtle(),
-            MarkdownGraphFormat.JsonLd => build.Graph.SerializeJsonLd(),
+            MarkdownGraphFormat.Mermaid => static graph => graph.SerializeMermaidFlowchart(),
+            MarkdownGraphFormat.Dot => static graph => graph.SerializeDotGraph(),
+            MarkdownGraphFormat.Turtle => static graph => graph.SerializeTurtle(),
+            MarkdownGraphFormat.JsonLd => static graph => graph.SerializeJsonLd(),
             _ => throw new ArgumentOutOfRangeException(nameof(format)),
         };
-        var truncated = content.Length > _options.MaximumGraphExportCharacters;
+
+        var (build, documentCount) = await BuildMarkdownGraphAsync(directory, cancellationToken).ConfigureAwait(false);
+        var content = serialize(build.Graph);
+        var length = Math.Min(content.Length, _options.MaximumGraphExportCharacters);
+        if (length > 0 && length < content.Length && char.IsSurrogatePair(content, length - 1))
+        {
+            length--;
+        }
 
         return new MarkdownGraphExportResult(
             format,
             documentCount,
             build.Graph.TripleCount,
-            truncated,
-            truncated ? content[.._options.MaximumGraphExportCharacters] : content);
+            length < content.Length,
+            content[..length]);
     }
 
     private async Task<(MarkdownKnowledgeBankBuild Build, int DocumentCount)> BuildMarkdownGraphAsync(
@@ -136,20 +142,21 @@ public sealed partial class FileContextService : IFileContext, IFileContextPdf
         matcher.AddInclude(_options.MarkdownGlob);
         var sources = new List<MarkdownSourceDocument>();
 
-        await foreach (var metadata in _fileStore.EnumerateScopedFilesAsync(normalizedDirectory, cancellationToken).ConfigureAwait(false))
+        await foreach (var (path, metadata) in _fileStore.EnumerateScopedFilesAsync(normalizedDirectory, cancellationToken).ConfigureAwait(false))
         {
-            var path = _fileStore.ToScopedPath(metadata.FullName);
-            if (!matcher.Match(path).HasMatches || metadata.Length > (ulong)_options.MaximumMarkdownSourceBytes)
+            if (!IsMarkdownPath(path) ||
+                metadata.Length > (ulong)_options.MaximumMarkdownSourceBytes || !matcher.Match(path).HasMatches)
             {
                 continue;
             }
 
-            var stream = await _fileStore.OpenReadAsync(path, cancellationToken).ConfigureAwait(false);
+            var stream = await _fileStore.OpenReadInOperationAsync(path, cancellationToken).ConfigureAwait(false);
             string content;
             await using (stream.ConfigureAwait(false))
             {
+                using var bounded = new StorageReadBudgetStream(stream, _options.MaximumMarkdownSourceBytes);
                 content = await StorageTextReader
-                    .ReadAsync(stream, _options.MaximumMarkdownSourceBytes, cancellationToken)
+                    .ReadAsync(bounded, _options.MaximumMarkdownSourceBytes, cancellationToken)
                     .ConfigureAwait(false);
             }
             sources.Add(new MarkdownSourceDocument(path, content));
@@ -169,5 +176,9 @@ public sealed partial class FileContextService : IFileContext, IFileContextPdf
         var build = await bank.BuildAsync(sources, cancellationToken).ConfigureAwait(false);
         return (build, sources.Count);
     }
+
+    private static bool IsMarkdownPath(string path) =>
+        path.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ||
+        path.EndsWith(".markdown", StringComparison.OrdinalIgnoreCase);
 
 }

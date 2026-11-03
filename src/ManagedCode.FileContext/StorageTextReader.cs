@@ -14,21 +14,17 @@ internal static class StorageTextReader
     {
         using var reader = new StreamReader(stream, Encoding.UTF8, true, ReaderBufferSize, leaveOpen: true);
         var buffer = new char[CharacterBufferLength];
-        var encoder = Encoding.UTF8.GetEncoder();
-        var encodedBuffer = new byte[Encoding.UTF8.GetMaxByteCount(CharacterBufferLength)];
         var builder = new StringBuilder();
-        var bytesRead = 0L;
+        var counter = new Utf8ByteCounter();
 
         while (await reader.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false) is var read && read > 0)
         {
-            bytesRead += encoder.GetBytes(buffer.AsSpan(0, read), encodedBuffer, flush: false);
-            EnsureWithinLimit(bytesRead, limit);
+            counter.Append(buffer.AsSpan(0, read));
+            EnsureWithinLimit(counter.TotalBytes, limit);
 
             builder.Append(buffer, 0, read);
         }
 
-        bytesRead += encoder.GetBytes(ReadOnlySpan<char>.Empty, encodedBuffer, flush: true);
-        EnsureWithinLimit(bytesRead, limit);
         return builder.ToString();
     }
 

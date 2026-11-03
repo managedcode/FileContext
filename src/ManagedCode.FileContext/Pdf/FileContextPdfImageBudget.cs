@@ -4,7 +4,9 @@ namespace ManagedCode.FileContext.Pdf;
 
 internal static class FileContextPdfImageBudget
 {
-    public static void Validate(Page page, FileContextOptions options)
+    public static void Validate(Page page, FileContextOptions options) => _ = Enumerate(page, options).Count();
+
+    public static IEnumerable<IPdfImage> Enumerate(Page page, FileContextOptions options)
     {
         long pixels = 0;
         var count = 0;
@@ -22,6 +24,8 @@ internal static class FileContextPdfImageBudget
             {
                 throw new IOException("The PDF page exceeds the embedded image count limit.");
             }
+
+            yield return image;
         }
     }
 }

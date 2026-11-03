@@ -37,13 +37,17 @@ internal static class FileContextDocxReader
                 ?? throw new InvalidDataException("A DOCX paragraph could not be read.");
             var text = paragraph.InnerText;
             var offset = number == startParagraph ? startCharacter : 0;
-            if (offset > text.Length)
+            if (offset > text.Length || SplitsSurrogatePair(text, offset))
             {
                 throw new ArgumentOutOfRangeException(nameof(startCharacter),
-                    "The character offset is beyond this paragraph.");
+                    "The character offset must be within this paragraph and at a Unicode character boundary.");
             }
             var length = Math.Min(text.Length - offset, remaining);
-            paragraphs.Add(new FileContextDocxParagraph(number, offset, text.Substring(offset, length)));
+            if (SplitsSurrogatePair(text, offset + length)) { length--; }
+            if (length > 0 || offset == text.Length)
+            {
+                paragraphs.Add(new FileContextDocxParagraph(number, offset, text.Substring(offset, length)));
+            }
             remaining -= length;
             if (offset + length < text.Length)
             {
@@ -53,4 +57,7 @@ internal static class FileContextDocxReader
 
         return new FileContextDocxText(path, paragraphs, null, 0);
     }
+
+    private static bool SplitsSurrogatePair(string text, int index) =>
+        index > 0 && index < text.Length && char.IsSurrogatePair(text, index - 1);
 }

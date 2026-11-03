@@ -7,6 +7,25 @@ namespace ManagedCode.FileContext.Tests;
 public sealed class WorkbookFormattingTests
 {
     [Fact]
+    public async Task Template_source_and_decompressed_limits_reject_before_persisting_output()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { EnableWriteTools = true };
+        var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
+        var template = await context.Documents.CreateWorkbookAsync("template.xlsx",
+            new([new("Data", [[new(Text: new string('x', 8_192))]])]));
+        var workbook = new FileContextWorkbook([new("Data", [[new(Text: "updated")]])]) { TemplatePath = template.Path };
+
+        options.MaximumFullReadBytes = 1;
+        await Should.ThrowAsync<IOException>(() => context.Documents.CreateWorkbookAsync("too-large.xlsx", workbook));
+        options.MaximumFullReadBytes = FileContextDefaults.MaximumFullReadBytes;
+        options.MaximumOpenXmlPartCharacters = 2_048;
+        await Should.ThrowAsync<System.Xml.XmlException>(() => context.Documents.CreateWorkbookAsync("too-wide.xlsx", workbook));
+
+        (await context.ListFilesAsync()).Select(static file => file.Path).ShouldBe([template.Path]);
+    }
+
+    [Fact]
     public async Task Styled_workbook_preserves_values_formulas_formats_widths_and_frozen_header()
     {
         await using var storage = await TestStorageScope.CreateAsync();

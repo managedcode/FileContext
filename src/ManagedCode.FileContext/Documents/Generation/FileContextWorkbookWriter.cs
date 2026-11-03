@@ -12,17 +12,19 @@ internal static class FileContextWorkbookWriter
     private const int MaximumColumns = 16_384;
     private const int MaximumCellTextLength = 32_767;
 
-    public static byte[] Create(FileContextWorkbook workbook, byte[]? template, CancellationToken cancellationToken)
+    public static void Write(FileContextWorkbook workbook, MemoryStream stream, bool useTemplate, long maximumPartCharacters,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(workbook);
         if (workbook.Sheets is null) { throw new ArgumentException("Workbook sheets are required.", nameof(workbook)); }
         if (workbook.Sheets.Count == 0) { throw new ArgumentException("A workbook needs at least one sheet.", nameof(workbook)); }
-        using var stream = new MemoryStream();
-        if (template is not null) { stream.Write(template); stream.Position = 0; }
-        using (var document = template is null ? SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook) : SpreadsheetDocument.Open(stream, true))
+        cancellationToken.ThrowIfCancellationRequested();
+        using (var document = useTemplate
+            ? SpreadsheetDocument.Open(stream, true, new OpenSettings { MaxCharactersInPart = maximumPartCharacters })
+            : SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook))
         {
             if (document.DocumentType != SpreadsheetDocumentType.Workbook)
-            { throw new ArgumentException("Template must be a macro-free XLSX workbook.", nameof(template)); }
+            { throw new ArgumentException("Template must be a macro-free XLSX workbook.", nameof(workbook)); }
             var part = document.WorkbookPart ?? document.AddWorkbookPart();
             part.Workbook ??= new Workbook { Sheets = new Sheets() };
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -35,7 +37,6 @@ internal static class FileContextWorkbookWriter
             }
             part.Workbook.Save();
         }
-        return stream.ToArray();
     }
 
     private static void WriteSheet(WorkbookPart part, FileContextWorksheet sheet, FileContextWorkbookStyles styles, CancellationToken token)

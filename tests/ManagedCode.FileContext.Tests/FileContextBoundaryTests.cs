@@ -28,6 +28,22 @@ public sealed class FileContextBoundaryTests
     }
 
     [Fact]
+    public async Task MarkdownGraph_WhenGlobAlsoMatchesOtherExtensions_UsesOnlyMarkdown()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { MarkdownGlob = "**/*" };
+        var store = new ManagedCodeStorageFileStore(scope.Storage, options);
+        var service = new FileContextService(store, options);
+        await store.WriteAsync("docs/included.MD", "# Included document");
+        await store.WriteAsync("docs/excluded.txt", "# Excluded document");
+
+        var result = await service.ExportMarkdownGraphAsync(MarkdownGraphFormat.Mermaid, "docs");
+
+        result.DocumentCount.ShouldBe(1);
+        result.Content.ShouldNotContain("Excluded document");
+    }
+
+    [Fact]
     public async Task ReadRange_WhenArgumentsAreOutsideConfiguredBounds_RejectsRequest()
     {
         await using var scope = await TestStorageScope.CreateAsync();
@@ -110,10 +126,28 @@ public sealed class FileContextBoundaryTests
         await using var scope = await TestStorageScope.CreateAsync();
         var store = new ManagedCodeStorageFileStore(scope.Storage);
         var service = new FileContextService(store);
-        await store.WriteAsync("context.md", "# Context\n\nStorage-backed context.");
 
         await Should.ThrowAsync<ArgumentOutOfRangeException>(() =>
             service.ExportMarkdownGraphAsync((MarkdownGraphFormat)int.MaxValue));
+    }
+
+    [Fact]
+    public async Task ExportMarkdownGraph_WhenLimitSplitsEmoji_EndsBeforeTheSurrogatePair()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions();
+        var store = new ManagedCodeStorageFileStore(scope.Storage, options);
+        var service = new FileContextService(store, options);
+        await store.WriteAsync("context.md", "# Context 😀\n\nStorage-backed context.");
+
+        var complete = await service.ExportMarkdownGraphAsync(MarkdownGraphFormat.Mermaid);
+        var emojiIndex = complete.Content.IndexOf("😀", StringComparison.Ordinal);
+        emojiIndex.ShouldBeGreaterThan(0);
+        options.MaximumGraphExportCharacters = emojiIndex + 1;
+
+        var truncated = await service.ExportMarkdownGraphAsync(MarkdownGraphFormat.Mermaid);
+        truncated.Truncated.ShouldBeTrue();
+        truncated.Content.ShouldBe(complete.Content[..emojiIndex]);
     }
 
     [Fact]

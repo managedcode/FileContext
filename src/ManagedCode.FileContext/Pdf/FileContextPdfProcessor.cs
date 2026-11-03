@@ -26,16 +26,8 @@ public sealed class FileContextPdfProcessor : IDisposable
 
     private sealed class Permit(SemaphoreSlim permits) : IDisposable
     {
-        private bool _disposed;
+        private SemaphoreSlim? _permits = permits;
 
-        public void Dispose()
-        {
-            if (_disposed)
-            {
-                return;
-            }
-            _disposed = true;
-            permits.Release();
-        }
+        public void Dispose() => Interlocked.Exchange(ref _permits, null)?.Release();
     }
 }

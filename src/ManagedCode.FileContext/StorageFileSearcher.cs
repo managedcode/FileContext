@@ -26,9 +26,8 @@ internal sealed class StorageFileSearcher(
         var results = new List<FileSearchResult>();
         var inspectedFiles = 0;
 
-        await foreach (var metadata in fileStore.EnumerateScopedFilesAsync(normalizedDirectory, cancellationToken).ConfigureAwait(false))
+        await foreach (var (path, metadata) in fileStore.EnumerateScopedFilesAsync(normalizedDirectory, cancellationToken).ConfigureAwait(false))
         {
-            var path = fileStore.ToScopedPath(metadata.FullName);
             if (!ShouldSearch(path, normalizedDirectory, recursive, metadata, matcher))
             {
                 continue;
@@ -83,31 +82,56 @@ internal sealed class StorageFileSearcher(
         Regex regex,
         CancellationToken cancellationToken)
     {
-        var stream = await fileStore.OpenReadAsync(path, cancellationToken).ConfigureAwait(false);
+        var stream = await fileStore.OpenReadInOperationAsync(path, cancellationToken).ConfigureAwait(false);
         await using (stream.ConfigureAwait(false))
         {
-            using var reader = new StreamReader(stream, Encoding.UTF8, true, leaveOpen: true);
-            var matches = new List<FileSearchMatch>();
-            var lineNumber = 0;
-
-            while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
-            {
-                lineNumber++;
-                cancellationToken.ThrowIfCancellationRequested();
-                if (regex.IsMatch(line))
-                {
-                    matches.Add(new FileSearchMatch { LineNumber = lineNumber, Line = line });
-                }
-
-                if (matches.Count >= options.MaximumMatchesPerFile)
-                {
-                    break;
-                }
-            }
-
+            var matches = await SearchLinesAsync(stream, regex, options, cancellationToken).ConfigureAwait(false);
             return matches.Count == 0
                 ? null
                 : new FileSearchResult { FileName = path, Snippet = matches[0].Line, MatchingLines = matches };
+        }
+    }
+
+    internal static async Task<List<FileSearchMatch>> SearchLinesAsync(
+        Stream stream, Regex regex, FileContextOptions options, CancellationToken cancellationToken)
+    {
+        using var bounded = new StorageReadBudgetStream(stream, options.MaximumSearchFileBytes);
+        using var reader = new StreamReader(bounded, Encoding.UTF8, true, leaveOpen: true);
+        var lineReader = new StorageTextLineReader(reader, long.MaxValue);
+        StringBuilder? splitLine = null;
+        var matches = new List<FileSearchMatch>();
+        var lineNumber = 0;
+
+        while (matches.Count < options.MaximumMatchesPerFile &&
+            await lineReader.HasNextLineAsync(cancellationToken).ConfigureAwait(false))
+        {
+            lineNumber++;
+            if (!lineReader.TryReadBufferedLine(out var line))
+            {
+                splitLine ??= new StringBuilder();
+                splitLine.Clear();
+                await lineReader.ReadLineAsync(splitLine, 0, cancellationToken).ConfigureAwait(false);
+                line = splitLine.ToString().AsMemory();
+            }
+
+            if (IsMatch(regex, line.Span, cancellationToken))
+            {
+                matches.Add(new FileSearchMatch { LineNumber = lineNumber, Line = line.ToString() });
+            }
+        }
+
+        return matches;
+    }
+
+    private static bool IsMatch(Regex regex, ReadOnlySpan<char> line, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return regex.IsMatch(line);
+        }
+        catch (RegexMatchTimeoutException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(cancellationToken);
         }
     }
 }

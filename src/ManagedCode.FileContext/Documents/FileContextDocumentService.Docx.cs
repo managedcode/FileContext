@@ -16,7 +16,8 @@ public sealed partial class FileContextDocumentService
 
         return ReadSourceAsync(path, (buffer, token) =>
         {
-            using var document = WordprocessingDocument.Open(buffer, false);
+            using var document = WordprocessingDocument.Open(buffer, false,
+                new OpenSettings { MaxCharactersInPart = options.MaximumOpenXmlPartCharacters });
             return FileContextDocxReader.Read(document, path, startParagraph, startCharacter,
                 paragraphCount, token);
         }, options.MaximumDocxReadBytes, cancellationToken);

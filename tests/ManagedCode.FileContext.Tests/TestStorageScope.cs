@@ -15,6 +15,12 @@ internal sealed class TestStorageScope : IAsyncDisposable
 
     public FileSystemStorage Storage { get; }
 
+    public void CreateSparseFile(string fileName, long byteLength)
+    {
+        using var source = new FileStream(Path.Combine(Directory, fileName), FileMode.CreateNew);
+        source.SetLength(byteLength);
+    }
+
     public static async Task<TestStorageScope> CreateAsync()
     {
         var directory = Path.Combine(Path.GetTempPath(), "managedcode-filecontext-tests", Guid.NewGuid().ToString("N"));

@@ -1,4 +1,5 @@
 using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Rendering.Skia;
 
 namespace ManagedCode.FileContext.Pdf;
@@ -52,32 +53,39 @@ public static class FileContextPdfImages
 
     /// <summary>Extracts embedded images from a bounded seekable source. The caller owns the stream.</summary>
     public static IReadOnlyList<FileContextPdfImage> ExtractPageImagesPng(Stream pdf, int pageNumber,
-        FileContextOptions? options = null)
+        FileContextOptions? options = null) => ReadPageImages(pdf, pageNumber, options, (images, settings) =>
+            images.Select((image, index) => new FileContextPdfImage(pageNumber, index + 1, EncodePng(image, settings))).ToArray());
+
+    internal static int CountPageImages(Stream pdf, int pageNumber, FileContextOptions options) =>
+        ReadPageImages(pdf, pageNumber, options, static (images, _) => images.Count);
+
+    internal static byte[] ExtractPageImagePng(Stream pdf, int pageNumber, int imageNumber, FileContextOptions options) =>
+        ReadPageImages(pdf, pageNumber, options, (images, settings) => imageNumber <= images.Count
+            ? EncodePng(images[imageNumber - 1], settings)
+            : throw new InvalidOperationException("The embedded image number is outside this PDF page."));
+
+    private static T ReadPageImages<T>(Stream pdf, int pageNumber, FileContextOptions? options,
+        Func<IReadOnlyList<IPdfImage>, FileContextOptions, T> read)
     {
         var settings = options ?? new FileContextOptions();
         FileContextPdfSource.Validate(pdf, settings);
         using var document = PdfDocument.Open(pdf, SkiaRenderingParsingOptions.Instance);
         ValidatePage(pageNumber, document.NumberOfPages);
-        var page = document.GetPage(pageNumber);
-        FileContextPdfImageBudget.Validate(page, settings);
-        var result = new List<FileContextPdfImage>();
-        foreach (var image in page.GetImages())
+        var images = FileContextPdfImageBudget.Enumerate(document.GetPage(pageNumber), settings).ToList();
+        return read(images, settings);
+    }
+
+    private static byte[] EncodePng(IPdfImage image, FileContextOptions settings)
+    {
+        if (!image.TryGetPng(out var bytes))
         {
-            if (result.Count >= settings.MaximumImagesPerPdfPage)
-            {
-                throw new IOException("The PDF page exceeds the embedded image count limit.");
-            }
-            if (!image.TryGetPng(out var bytes))
-            {
-                throw new NotSupportedException("An embedded PDF image could not be decoded as PNG.");
-            }
-            if (bytes.Length > settings.MaximumImageBytes)
-            {
-                throw new IOException("An embedded PDF image exceeds the image byte limit.");
-            }
-            result.Add(new FileContextPdfImage(pageNumber, result.Count + 1, bytes.ToArray()));
+            throw new NotSupportedException("An embedded PDF image could not be decoded as PNG.");
         }
-        return result;
+        if (bytes.Length > settings.MaximumImageBytes)
+        {
+            throw new IOException("An embedded PDF image exceeds the image byte limit.");
+        }
+        return bytes;
     }
 
     private static void ValidateInput(byte[] pdf, FileContextOptions options)

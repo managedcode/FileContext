@@ -5,17 +5,25 @@ internal static class FileContextOperation
     public static async Task<T> RunAsync<T>(
         TimeSpan? timeout,
         Func<CancellationToken, Task<T>> operation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<T, ValueTask>? releaseCancelledResult = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        using var deadline = timeout is { } duration ? new CancellationTokenSource(duration) : null;
-        using var linked = deadline is null ? null : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
-        var operationToken = linked?.Token ?? cancellationToken;
+        using var deadline = timeout.HasValue ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken) : null;
+        deadline?.CancelAfter(timeout.GetValueOrDefault());
+        var operationToken = deadline?.Token ?? cancellationToken;
         try
         {
             operationToken.ThrowIfCancellationRequested();
             var result = await operation(operationToken).ConfigureAwait(false);
-            operationToken.ThrowIfCancellationRequested();
+            if (operationToken.IsCancellationRequested)
+            {
+                if (releaseCancelledResult is not null)
+                {
+                    await releaseCancelledResult(result).ConfigureAwait(false);
+                }
+                operationToken.ThrowIfCancellationRequested();
+            }
             return result;
         }
         catch (Exception exception) when (operationToken.IsCancellationRequested && exception is OperationCanceledException or IOException)

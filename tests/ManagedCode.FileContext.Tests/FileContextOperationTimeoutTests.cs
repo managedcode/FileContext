@@ -8,24 +8,41 @@ public sealed class FileContextOperationTimeoutTests
     public async Task ExpiredDeadline_FailsWholeOperation(string operation)
     {
         await using var scope = await TestStorageScope.CreateAsync();
-        var setup = new ManagedCodeStorageFileStore(scope.Storage);
-        await setup.WriteAsync("slow.txt", new string('a', 1_000_000));
-        var options = new FileContextOptions { OperationTimeout = TimeSpan.FromMilliseconds(1) };
+        await PrepareSlowSourceAsync(scope, operation);
+        var options = new FileContextOptions
+        {
+            OperationTimeout = TimeSpan.FromMilliseconds(10),
+            RegexTimeout = TimeSpan.FromMilliseconds(250),
+        };
         var store = new ManagedCodeStorageFileStore(scope.Storage, options);
         var context = new FileContextService(store, options);
 
         var exception = await Should.ThrowAsync<TimeoutException>(() => operation switch
         {
             "range" => (Task)context.ReadRangeAsync("slow.txt", startLine: 2),
-            _ => store.SearchAsync("", "^(a+)+b?$"),
+            _ => store.SearchAsync("", "^(a+)+$"),
         });
 
         exception.Message.ShouldContain("configured");
     }
 
+    private static async Task PrepareSlowSourceAsync(TestStorageScope scope, string operation)
+    {
+        if (string.Equals(operation, "range", StringComparison.Ordinal))
+        {
+            // A sparse, unterminated first line keeps the range scan active without writing a large fixture.
+            scope.CreateSparseFile("slow.txt", 1L << 30);
+            return;
+        }
+
+        var store = new ManagedCodeStorageFileStore(scope.Storage);
+        await store.WriteAsync("slow.txt", new string('a', 100_000) + "!").ConfigureAwait(false);
+    }
+
     [Theory]
     [InlineData("write")]
     [InlineData("read")]
+    [InlineData("open")]
     [InlineData("delete")]
     [InlineData("list")]
     [InlineData("exists")]
@@ -65,6 +82,22 @@ public sealed class FileContextOperationTimeoutTests
         result.Content.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task A_stream_returned_after_cancellation_is_released_instead_of_leaking()
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var stream = new MemoryStream();
+        var error = await Should.ThrowAsync<OperationCanceledException>(() =>
+            FileContextOperation.RunAsync(TimeSpan.FromSeconds(5), async _ =>
+            {
+                await cancellation.CancelAsync().ConfigureAwait(false);
+                return stream;
+            }, cancellation.Token, static result => result.DisposeAsync()));
+
+        error.CancellationToken.ShouldBe(cancellation.Token);
+        stream.CanRead.ShouldBeFalse();
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
@@ -91,6 +124,7 @@ public sealed class FileContextOperationTimeoutTests
         {
             "write" => store.WriteAsync("notes.txt", "changed", token),
             "read" => store.ReadAsync("notes.txt", token),
+            "open" => store.OpenReadAsync("notes.txt", token),
             "delete" => store.DeleteAsync("notes.txt", token),
             "list" => store.ListChildrenAsync("", token),
             "exists" => store.FileExistsAsync("notes.txt", token),

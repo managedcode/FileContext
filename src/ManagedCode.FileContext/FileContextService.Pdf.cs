@@ -42,7 +42,7 @@ public sealed partial class FileContextService
             using var permit = await _pdfProcessor.AcquireAsync(token).ConfigureAwait(false);
             var source = await OpenPdfAsync(path, token).ConfigureAwait(false);
             await using var sourceLifetime = source.ConfigureAwait(false);
-            return FileContextPdfImages.ExtractPageImagesPng(source.Stream, pageNumber, _options).Count;
+            return FileContextPdfImages.CountPageImages(source.Stream, pageNumber, _options);
         }, cancellationToken);
 
     public Task<DataContent> ExtractPdfImageAsync(string path, int pageNumber, int imageNumber,
@@ -54,12 +54,8 @@ public sealed partial class FileContextService
             using var permit = await _pdfProcessor.AcquireAsync(token).ConfigureAwait(false);
             var source = await OpenPdfAsync(path, token).ConfigureAwait(false);
             await using var sourceLifetime = source.ConfigureAwait(false);
-            var images = FileContextPdfImages.ExtractPageImagesPng(source.Stream, pageNumber, _options);
-            if (imageNumber > images.Count)
-            {
-                throw new InvalidOperationException("The embedded image number is outside this PDF page.");
-            }
-            return FileContextImageContent.FromPngBytes(images[imageNumber - 1].PngBytes, _options);
+            var png = FileContextPdfImages.ExtractPageImagePng(source.Stream, pageNumber, imageNumber, _options);
+            return FileContextImageContent.FromPngBytes(png, _options);
         }, cancellationToken);
     }
 
@@ -76,7 +72,7 @@ public sealed partial class FileContextService
             throw new IOException("The PDF exceeds the read limit.");
         }
         return await FileContextPdfSource.OpenAsync(
-            await _fileStore.OpenReadAsync(path, cancellationToken).ConfigureAwait(false), _options, cancellationToken)
+            await _fileStore.OpenReadInOperationAsync(path, cancellationToken).ConfigureAwait(false), _options, cancellationToken)
             .ConfigureAwait(false);
     }
 }

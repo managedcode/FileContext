@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Xml;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
@@ -12,14 +13,36 @@ internal static class FileContextWorkbookReader
     private const int MaximumRows = 1_048_576;
     private const int MaximumColumns = 16_384;
 
-    public static FileContextWorkbookInfo Inspect(SpreadsheetDocument document, string path)
+    public static FileContextWorkbookInfo Inspect(SpreadsheetDocument document, string path, CancellationToken token)
     {
         var workbook = RequireWorkbook(document);
         var sheets = workbook.Workbook?.Sheets?.Elements<Sheet>() ?? [];
-        return new(path, sheets.Select(sheet => new FileContextWorksheetInfo(
-            sheet.Name?.Value ?? string.Empty,
-            sheet.State?.InnerText ?? "visible",
-            ((WorksheetPart)workbook.GetPartById(sheet.Id!)).Worksheet?.GetFirstChild<SheetDimension>()?.Reference?.Value)).ToArray());
+        var result = new List<FileContextWorksheetInfo>();
+        foreach (var sheet in sheets)
+        {
+            token.ThrowIfCancellationRequested();
+            var dimension = workbook.GetPartById(sheet.Id!) is WorksheetPart worksheet
+                ? ReadDimension(worksheet, token)
+                : null;
+            result.Add(new(sheet.Name?.Value ?? string.Empty, sheet.State?.InnerText ?? "visible", dimension));
+        }
+        return new(path, result);
+    }
+
+    private static string? ReadDimension(WorksheetPart worksheet, CancellationToken token)
+    {
+        using var reader = OpenXmlReader.Create(worksheet);
+        while (reader.Read())
+        {
+            token.ThrowIfCancellationRequested();
+            if (!reader.IsStartElement) { continue; }
+            if (reader.ElementType == typeof(SheetDimension))
+            {
+                return ((SheetDimension)reader.LoadCurrentElement()!).Reference?.Value;
+            }
+            if (reader.ElementType == typeof(SheetData)) { break; }
+        }
+        return null;
     }
 
     public static FileContextWorkbookRange Read(SpreadsheetDocument document, string path, string sheetName,
@@ -52,15 +75,17 @@ internal static class FileContextWorkbookReader
     {
         using var reader = OpenXmlReader.Create(worksheet);
         var cells = new List<FileContextWorkbookCell>();
+        if (!MoveToFirstRow(reader, token)) { return cells; }
+
         long bytes = 0;
         var rowNumber = 0;
-        while (reader.Read())
+        do
         {
             token.ThrowIfCancellationRequested();
             if (reader.ElementType != typeof(Row) || !reader.IsStartElement) { continue; }
-            var row = (Row)reader.LoadCurrentElement()!;
-            rowNumber = row.RowIndex is null ? rowNumber + 1 : checked((int)row.RowIndex.Value);
+            rowNumber = ReadRowNumber(reader, rowNumber);
             if (rowNumber < startRow || rowNumber >= startRow + rowCount) { continue; }
+            var row = (Row)reader.LoadCurrentElement()!;
             var column = 0;
             foreach (var cell in row.Elements<Cell>())
             {
@@ -68,12 +93,40 @@ internal static class FileContextWorkbookReader
                 column = cell.CellReference is null ? column + 1 : ReadColumn(cell.CellReference.Value!);
                 if (column < startColumn || column >= startColumn + columnCount) { continue; }
                 var value = ReadCell(cell, strings, $"{ColumnName(column)}{rowNumber}");
-                bytes += Encoding.UTF8.GetByteCount(value.Value) + Encoding.UTF8.GetByteCount(value.Formula ?? string.Empty) + value.Address.Length + value.Type.Length;
+                bytes += (long)Encoding.UTF8.GetByteCount(value.Value) + Encoding.UTF8.GetByteCount(value.Formula ?? string.Empty) + value.Address.Length + value.Type.Length;
                 if (bytes > byteLimit) { throw new IOException("Workbook range exceeds the configured read budget. Request a smaller range."); }
                 cells.Add(value);
             }
         }
+        while (reader.ReadNextSibling());
         return cells;
+    }
+
+    private static bool MoveToFirstRow(OpenXmlReader reader, CancellationToken token)
+    {
+        while (reader.Read())
+        {
+            token.ThrowIfCancellationRequested();
+            if (reader.IsStartElement && reader.ElementType == typeof(SheetData))
+            {
+                return reader.ReadFirstChild();
+            }
+        }
+        return false;
+    }
+
+    private static int ReadRowNumber(OpenXmlReader reader, int previous)
+    {
+        var attributes = reader.Attributes;
+        for (var index = 0; index < attributes.Count; index++)
+        {
+            var attribute = attributes[index];
+            if (string.IsNullOrEmpty(attribute.NamespaceUri) && string.Equals(attribute.LocalName, "r", StringComparison.Ordinal))
+            {
+                return checked((int)XmlConvert.ToUInt32(attribute.Value!));
+            }
+        }
+        return previous + 1;
     }
 
     internal static FileContextWorkbookCell ReadCell(Cell cell, string[] strings, string address)
@@ -103,20 +156,24 @@ internal static class FileContextWorkbookReader
     internal static int ReadColumn(string address)
     {
         var result = 0;
-        foreach (var character in address.TakeWhile(char.IsAsciiLetter))
-        { result = checked(result * AlphabetLength + char.ToUpperInvariant(character) - 'A' + 1); }
+        foreach (var character in address)
+        {
+            if (!char.IsAsciiLetter(character)) { break; }
+            result = checked(result * AlphabetLength + char.ToUpperInvariant(character) - 'A' + 1);
+        }
         return result;
     }
 
     private static string ColumnName(int column)
     {
-        var result = new StringBuilder();
+        Span<char> result = stackalloc char[3]; // Excel's last column is XFD.
+        var start = result.Length;
         while (column > 0)
         {
             column--;
-            result.Insert(0, (char)('A' + column % AlphabetLength));
+            result[--start] = (char)('A' + column % AlphabetLength);
             column /= AlphabetLength;
         }
-        return result.ToString();
+        return new string(result[start..]);
     }
 }

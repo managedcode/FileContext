@@ -12,27 +12,18 @@ internal sealed class FileContextRangeReader(long maximumBytes)
         CancellationToken cancellationToken)
     {
         var builder = new StringBuilder();
-        var lineReader = new StorageTextLineReader(reader);
+        var lineReader = new StorageTextLineReader(reader, maximumBytes);
         var currentLine = 0;
         var linesAdded = 0;
         var bytesAdded = 0L;
         var separatorBytes = Encoding.UTF8.GetByteCount(Environment.NewLine);
 
-        while (true)
+        while (await lineReader.HasNextLineAsync(cancellationToken).ConfigureAwait(false))
         {
-            var captureContent = currentLine + FileContextDefaults.FirstLineNumber >= startLine && linesAdded < lineCount;
-            var bytesBeforeLine = bytesAdded + (captureContent && linesAdded > 0 ? separatorBytes : 0);
-            var line = await lineReader
-                .ReadAsync(captureContent, maximumBytes, bytesBeforeLine, cancellationToken)
-                .ConfigureAwait(false);
-            if (!line.HasLine)
-            {
-                return CreateCompleted(path, startLine, currentLine, linesAdded, builder);
-            }
-
             currentLine++;
             if (currentLine < startLine)
             {
+                await lineReader.ReadLineAsync(null, 0, cancellationToken).ConfigureAwait(false);
                 continue;
             }
 
@@ -47,10 +38,11 @@ internal sealed class FileContextRangeReader(long maximumBytes)
                 bytesAdded += separatorBytes;
             }
 
-            builder.Append(line.Content);
-            bytesAdded += line.Utf8Bytes;
+            bytesAdded += await lineReader.ReadLineAsync(builder, bytesAdded, cancellationToken).ConfigureAwait(false);
             linesAdded++;
         }
+
+        return CreateCompleted(path, startLine, currentLine, linesAdded, builder);
     }
 
     private static FileContextRange CreateContinuation(

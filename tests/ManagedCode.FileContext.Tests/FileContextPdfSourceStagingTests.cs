@@ -136,6 +136,21 @@ public sealed class FileContextPdfSourceStagingTests
     }
 
     [Fact]
+    public async Task Source_disposal_failure_removes_staged_file_without_disposing_again()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = Options(scope);
+        var input = await InputAsync(scope, BufferBytes);
+        input.FailDispose = true;
+
+        var error = await Should.ThrowAsync<IOException>(() => FileContextPdfSource.OpenAsync(input, options));
+
+        error.Message.ShouldBe("Source disposal failed.");
+        input.DisposeCount.ShouldBe(1);
+        Directory.GetFiles(options.PdfTemporaryDirectory!).ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Invalid_staging_options_are_rejected_before_source_reads()
     {
         await using var scope = await TestStorageScope.CreateAsync();

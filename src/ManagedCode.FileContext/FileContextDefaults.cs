@@ -5,6 +5,9 @@ public static class FileContextDefaults
 {
     public const int MaximumPdfPngQuality = 100;
     public const long MaximumGeneratedFileBytes = 64L * 1024L * 1024L;
+    public const int MaximumReportInputBytes = 10_000_000;
+    public const int MaximumReportPages = 60;
+    public const int ReportTimeoutSeconds = 60;
     public const int FirstLineNumber = 1;
     public const int MaximumPdfReadBytes = 100 * 1024 * 1024;
     public const int MaximumConcurrentPdfOperations = 1;
@@ -19,6 +22,7 @@ public static class FileContextDefaults
     public const int PdfPngQuality = 100;
     public const int MaximumPdfTextCharacters = 50_000;
     public const int MaximumDocxReadBytes = 25 * 1024 * 1024;
+    public const long MaximumOpenXmlPartCharacters = 32L * 1024 * 1024;
     public const int MaximumDocxTextCharacters = 20_000;
     public const int MaximumDocxParagraphsPerRead = 50;
     public const long MaximumFullReadBytes = 1_024 * 1_024;
@@ -26,6 +30,7 @@ public static class FileContextDefaults
     public const int DefaultRangeLineCount = 200;
     public const int MaximumRangeLineCount = 1_000;
     public const int MaximumSearchFiles = 500;
+    public const int MaximumDirectoryEntries = 1_000;
     public const long MaximumSearchFileBytes = 4 * 1_024 * 1_024;
     public const int MaximumSearchResults = 100;
     public const int MaximumMatchesPerFile = 20;

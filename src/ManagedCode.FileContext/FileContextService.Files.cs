@@ -9,10 +9,8 @@ public sealed partial class FileContextService
     {
         var normalized = StoragePathScope.Normalize(directory, allowEmpty: true);
         var files = new List<FileContextInfo>();
-        await foreach (var metadata in _fileStore.EnumerateScopedFilesAsync(normalized, cancellationToken).ConfigureAwait(false))
+        await foreach (var (path, metadata) in _fileStore.EnumerateScopedFilesAsync(normalized, cancellationToken).ConfigureAwait(false))
         {
-            var path = _fileStore.ToScopedPath(metadata.FullName);
-            if (!StoragePathScope.TryGetRemainder(path, normalized, out _)) { continue; }
             files.Add(new FileContextInfo(path, metadata.Length, metadata.MimeType, metadata.LastModified));
             if (files.Count >= _options.MaximumSearchFiles) { break; }
         }

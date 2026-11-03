@@ -72,6 +72,32 @@ public sealed class ReportCreationTests
         (await store.ListChildrenAsync("outputs")).ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task Disabled_report_writes_are_rejected_before_rendering_or_validating_content()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions();
+        var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
+        var report = new FileContextReport("Report", "test", [], ["unsupported"]);
+
+        await Should.ThrowAsync<InvalidOperationException>(() => context.Documents.CreateReportAsync(report));
+    }
+
+    [Fact]
+    public async Task Report_output_budget_is_checked_before_uploading_any_artifact()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { EnableWriteTools = true };
+        var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
+        var report = new FileContextReport("Report", "test", [Block("text", new { text = "Report content" })], ["html"]);
+        var first = (await context.Documents.CreateReportAsync(report)).Files.Single();
+        options.MaximumGeneratedFileBytes = first.Length;
+
+        await Should.ThrowAsync<IOException>(() => context.Documents.CreateReportAsync(report with { Outputs = ["html", "pdf"] }));
+
+        (await context.ListFilesAsync()).Select(static file => file.Path).ShouldBe([first.Path]);
+    }
+
 
     [Theory]
     [InlineData("line")]

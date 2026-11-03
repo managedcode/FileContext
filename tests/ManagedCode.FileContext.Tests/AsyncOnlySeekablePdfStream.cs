@@ -4,9 +4,11 @@ namespace ManagedCode.FileContext.Tests;
 internal sealed class AsyncOnlySeekablePdfStream(FileStream source) : Stream
 {
     public bool WasDisposed { get; private set; }
+    public int DisposeCount { get; private set; }
     public int MaximumReadRequestBytes { get; private set; }
     public CancellationTokenSource? CancelAfterRead { get; set; }
     public bool FailRead { get; set; }
+    public bool FailDispose { get; set; }
     public bool HideSeekability { get; set; }
     public override bool CanRead => source.CanRead;
     public override bool CanSeek => !HideSeekability;
@@ -33,7 +35,12 @@ internal sealed class AsyncOnlySeekablePdfStream(FileStream source) : Stream
     protected override void Dispose(bool disposing)
     {
         WasDisposed = true;
-        if (disposing) { source.Dispose(); }
+        if (disposing)
+        {
+            DisposeCount++;
+            source.Dispose();
+            if (FailDispose) { throw new IOException("Source disposal failed."); }
+        }
         base.Dispose(disposing);
     }
 }

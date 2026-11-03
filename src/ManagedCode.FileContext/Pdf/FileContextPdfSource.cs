@@ -1,5 +1,3 @@
-using System.Buffers;
-
 namespace ManagedCode.FileContext.Pdf;
 
 /// <summary>Owns a bounded local PDF source; cloud inputs are staged before synchronous random reads.</summary>
@@ -16,10 +14,11 @@ public sealed class FileContextPdfSource : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
-        ArgumentNullException.ThrowIfNull(options);
         Stream? staged = null;
+        var disposeSourceOnFailure = true;
         try
         {
+            ArgumentNullException.ThrowIfNull(options);
             options.Validate();
             cancellationToken.ThrowIfCancellationRequested();
             if (source.CanSeek)
@@ -36,15 +35,20 @@ public sealed class FileContextPdfSource : IAsyncDisposable
                 return new FileContextPdfSource(source);
             }
             staged = CreateTemporaryFile(options);
-            await CopyAsync(source, staged, options, cancellationToken).ConfigureAwait(false);
+            using var bounded = new StorageReadBudgetStream(source, options.MaximumPdfReadBytes);
+            await bounded.CopyToAsync(staged, options.PdfSourceBufferBytes, cancellationToken).ConfigureAwait(false);
             staged.Position = 0;
+            disposeSourceOnFailure = false;
             await source.DisposeAsync().ConfigureAwait(false);
             return new FileContextPdfSource(staged);
         }
         catch
         {
             try { if (staged is not null) { await staged.DisposeAsync().ConfigureAwait(false); } }
-            finally { await source.DisposeAsync().ConfigureAwait(false); }
+            finally
+            {
+                if (disposeSourceOnFailure) { await source.DisposeAsync().ConfigureAwait(false); }
+            }
             throw;
         }
     }
@@ -63,26 +67,6 @@ public sealed class FileContextPdfSource : IAsyncDisposable
         source.Position = 0;
     }
 
-    private static async Task CopyAsync(Stream source, Stream staged, FileContextOptions options,
-        CancellationToken cancellationToken)
-    {
-        var buffer = ArrayPool<byte>.Shared.Rent(options.PdfSourceBufferBytes);
-        try
-        {
-            int read;
-            while ((read = await source.ReadAsync(buffer.AsMemory(0, options.PdfSourceBufferBytes), cancellationToken)
-                .ConfigureAwait(false)) > 0)
-            {
-                if (staged.Length + read > options.MaximumPdfReadBytes)
-                {
-                    throw new IOException("The PDF exceeds the read limit.");
-                }
-                await staged.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
-            }
-        }
-        finally { ArrayPool<byte>.Shared.Return(buffer, clearArray: true); }
-    }
-
     private static FileStream CreateTemporaryFile(FileContextOptions options)
     {
         var fileOptions = new FileStreamOptions
@@ -90,7 +74,7 @@ public sealed class FileContextPdfSource : IAsyncDisposable
             Mode = FileMode.CreateNew,
             Access = FileAccess.ReadWrite,
             Share = FileShare.None,
-            BufferSize = options.PdfSourceBufferBytes,
+            BufferSize = Math.Min(options.PdfSourceBufferBytes, options.MaximumPdfReadBytes),
             Options = FileOptions.Asynchronous | FileOptions.DeleteOnClose
         };
         if (!OperatingSystem.IsWindows())

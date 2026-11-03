@@ -24,6 +24,6 @@ Block content is JSON:
 - `callout`: `text`.
 - `page-break`: empty content.
 
-All requested outputs render in memory before FileContext stores any file. Validation caps the expanded report at 10 MB, PDF at 60 pages, and render time at 60 seconds. Image blocks are capped at 5 MB. PDF chart and table rows are kept intact across pages, table headers repeat after a page break, and each page has a title, NYWD mark or theme logo, UTC date, and page number. Failures name the block index and type where possible.
+All requested outputs render in memory before FileContext stores any file. The combined size of the outputs must fit `MaximumGeneratedFileBytes`. `MaximumReportInputBytes` and `MaximumReportPages` default to 10 MB and 60 pages. `OperationTimeout` covers rendering and upload, with a 60-second report default. Image blocks are capped at 5 MB. PDF chart and table rows are kept intact across pages, table headers repeat after a page break, and each page has a title, NYWD mark or theme logo, UTC date, and page number. Failures name the block index and type where possible.
 
 Named template and theme persistence, network allowlists, operator authorization, and authenticated download links belong to the host. `AIAgents.App` implements that boundary in its `AgentFiles/Reports` module.

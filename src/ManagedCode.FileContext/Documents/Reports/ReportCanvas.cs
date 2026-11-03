@@ -54,18 +54,19 @@ internal static class ReportCanvas
         var lines = new List<string>();
         foreach (var paragraph in value.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n'))
         {
-            var current = string.Empty;
+            var start = 0;
+            var position = 0;
             foreach (var rune in paragraph.EnumerateRunes())
             {
-                var candidate = current + rune;
-                if (MeasureText(candidate, paint) > width && current.Length > 0)
+                var end = position + rune.Utf16SequenceLength;
+                if (position > start && paint.Font.MeasureText(paragraph.AsSpan(start, end - start), paint.ColorPaint) > width)
                 {
-                    lines.Add(current);
-                    current = rune.ToString();
+                    lines.Add(paragraph[start..position]);
+                    start = position;
                 }
-                else { current = candidate; }
+                position = end;
             }
-            lines.Add(current);
+            lines.Add(paragraph[start..]);
         }
         return lines;
     }

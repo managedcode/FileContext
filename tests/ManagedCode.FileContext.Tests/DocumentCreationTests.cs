@@ -117,8 +117,10 @@ public sealed class DocumentCreationTests
         await using var storage = await TestStorageScope.CreateAsync();
         var options = new FileContextOptions { EnableWriteTools = true, MaximumGeneratedFileBytes = 4 };
         var store = new ManagedCodeStorageFileStore(storage.Storage, options);
-        using var bytes = new MemoryStream(Encoding.UTF8.GetBytes("12345"));
+        using var bytes = new MemoryStream(new byte[1_024]);
         await Should.ThrowAsync<IOException>(() => store.CreateFileAsync("large.bin", bytes, "application/octet-stream"));
+        bytes.Position.ShouldBe(options.MaximumGeneratedFileBytes + 1);
+        bytes.CanRead.ShouldBeTrue();
         using var cancelled = new CancellationTokenSource();
         await cancelled.CancelAsync();
         await Should.ThrowAsync<OperationCanceledException>(() => new FileContextService(store, options).Documents.CreateTextAsync("x.txt", "x", cancelled.Token));

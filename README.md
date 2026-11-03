@@ -262,12 +262,16 @@ Paths are logical, relative, and `/`-separated. `RootPrefix` scopes storage acce
 | `PdfPngQuality` | 100 |
 | `MaximumFullReadBytes` | 1 MiB |
 | `MaximumRangeReadBytes` | 256 KiB |
+| `MaximumDirectoryEntries` | 1,000 direct children |
+| `MaximumOpenXmlPartCharacters` | 32 Mi characters per decompressed XML part |
+| `MaximumGeneratedFileBytes` | 64 MiB per generated file or complete report |
+| `MaximumReportInputBytes` / `MaximumReportPages` | 10,000,000 bytes / 60 pages |
 | `DefaultRangeLineCount` / `MaximumRangeLineCount` | 200 / 1,000 |
 | `MaximumSearchFiles` | 500 |
 | `MaximumSearchFileBytes` | 4 MiB |
 | `MaximumSearchResults` / `MaximumMatchesPerFile` | 100 / 20 |
 | `RegexTimeout` | 2 seconds per regex match |
-| `OperationTimeout` | `null` (no additional operation deadline) |
+| `OperationTimeout` | `null` (reports default to 60 seconds) |
 | `MarkdownGlob` | `**/*.md` |
 | `MaximumMarkdownFiles` | 100 |
 | `MaximumMarkdownSourceBytes` | 1 MiB per file |

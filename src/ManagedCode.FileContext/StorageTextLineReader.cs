@@ -2,119 +2,92 @@ using System.Text;
 
 namespace ManagedCode.FileContext;
 
-internal sealed class StorageTextLineReader(StreamReader reader)
+internal sealed class StorageTextLineReader(StreamReader reader, long maximumBytes)
 {
-    private const int EndOfStream = -1;
-    private const int Utf8AsciiBytes = 1;
-    private const int Utf8TwoByteCharacterBytes = 2;
-    private const int Utf8ThreeByteCharacterBytes = 3;
-    private const int Utf8SurrogatePairBytes = 4;
-    private const char Utf8AsciiMaximum = '\u007f';
-    private const char Utf8TwoByteCharacterMaximum = '\u07ff';
-    private readonly char[] _characterBuffer = new char[1];
-    private char? _pendingCharacter;
+    private readonly char[] _buffer = new char[4_096];
+    private int _position;
+    private int _length;
+    private bool _skipLineFeed;
 
-    public async ValueTask<(bool HasLine, string Content, long Utf8Bytes)> ReadAsync(
-        bool captureContent,
-        long maximumBytes,
-        long bytesAlreadyCaptured,
-        CancellationToken cancellationToken)
+    private ReadOnlySpan<char> BufferedCharacters => _buffer.AsSpan(_position, _length - _position);
+
+    public async ValueTask<bool> HasNextLineAsync(CancellationToken cancellationToken)
     {
-        var builder = captureContent ? new StringBuilder() : null;
-        var lineBytes = 0L;
-        var hasPendingHighSurrogate = false;
-        var readAny = false;
-
-        while (await ReadCharacterAsync(cancellationToken).ConfigureAwait(false) is var value && value != EndOfStream)
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_skipLineFeed)
         {
-            readAny = true;
-            var character = (char)value;
-            if (character is '\r' or '\n')
+            _skipLineFeed = false;
+            if (await EnsureBufferedAsync(cancellationToken).ConfigureAwait(false) && _buffer[_position] == '\n')
             {
-                await ConsumeLineFeedAfterCarriageReturnAsync(character, cancellationToken).ConfigureAwait(false);
-                lineBytes += hasPendingHighSurrogate ? Utf8ThreeByteCharacterBytes : 0;
-                EnsureWithinLimit(captureContent, maximumBytes, bytesAlreadyCaptured + lineBytes);
-                return (true, builder?.ToString() ?? string.Empty, lineBytes);
-            }
-
-            if (captureContent)
-            {
-                builder!.Append(character);
-                lineBytes += CountUtf8Bytes(character, ref hasPendingHighSurrogate);
-                EnsureWithinLimit(true, maximumBytes, bytesAlreadyCaptured + lineBytes);
+                _position++;
             }
         }
 
-        lineBytes += hasPendingHighSurrogate ? Utf8ThreeByteCharacterBytes : 0;
-        EnsureWithinLimit(captureContent, maximumBytes, bytesAlreadyCaptured + lineBytes);
-        return readAny
-            ? (true, builder?.ToString() ?? string.Empty, lineBytes)
-            : (false, string.Empty, 0);
+        return await EnsureBufferedAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private async ValueTask<int> ReadCharacterAsync(CancellationToken cancellationToken)
+    // The returned memory is borrowed until the next read.
+    public bool TryReadBufferedLine(out ReadOnlyMemory<char> line)
     {
-        if (_pendingCharacter is { } pending)
+        var lineBreak = BufferedCharacters.IndexOfAny('\r', '\n');
+        if (lineBreak < 0)
         {
-            _pendingCharacter = null;
-            return pending;
+            line = default;
+            return false;
         }
 
-        var count = await reader.ReadAsync(_characterBuffer.AsMemory(), cancellationToken).ConfigureAwait(false);
-        return count == 0 ? EndOfStream : _characterBuffer[0];
+        line = _buffer.AsMemory(_position, lineBreak);
+        _position += lineBreak;
+        ConsumeLineBreak();
+        return true;
     }
 
-    private async ValueTask ConsumeLineFeedAfterCarriageReturnAsync(
-        char lineBreak,
-        CancellationToken cancellationToken)
+    // The caller has already established that a line is available with HasNextLineAsync.
+    public async ValueTask<long> ReadLineAsync(StringBuilder? destination, long bytesAlreadyCaptured, CancellationToken cancellationToken)
     {
-        if (lineBreak != '\r')
+        var counter = new Utf8ByteCounter();
+        do
         {
-            return;
-        }
-
-        var next = await ReadCharacterAsync(cancellationToken).ConfigureAwait(false);
-        if (next != EndOfStream && next != '\n')
-        {
-            _pendingCharacter = (char)next;
-        }
-    }
-
-    private static int CountUtf8Bytes(char character, ref bool hasPendingHighSurrogate)
-    {
-        var byteCount = 0;
-        if (hasPendingHighSurrogate)
-        {
-            hasPendingHighSurrogate = false;
-            if (char.IsLowSurrogate(character))
+            var available = BufferedCharacters;
+            var lineBreak = available.IndexOfAny('\r', '\n');
+            var chunk = lineBreak < 0 ? available : available[..lineBreak];
+            if (destination is not null)
             {
-                return Utf8SurrogatePairBytes;
+                counter.Append(chunk);
+                EnsureWithinLimit(bytesAlreadyCaptured, counter.TotalBytes);
+                destination.Append(chunk);
             }
 
-            byteCount = Utf8ThreeByteCharacterBytes;
+            _position += chunk.Length;
+            if (lineBreak >= 0)
+            {
+                ConsumeLineBreak();
+                break;
+            }
         }
+        while (await EnsureBufferedAsync(cancellationToken).ConfigureAwait(false));
 
-        if (char.IsHighSurrogate(character))
-        {
-            hasPendingHighSurrogate = true;
-            return byteCount;
-        }
-
-        if (character <= Utf8AsciiMaximum)
-        {
-            return byteCount + Utf8AsciiBytes;
-        }
-
-        return byteCount + (character <= Utf8TwoByteCharacterMaximum
-            ? Utf8TwoByteCharacterBytes
-            : Utf8ThreeByteCharacterBytes);
+        return counter.TotalBytes;
     }
 
-    private static void EnsureWithinLimit(bool captureContent, long maximumBytes, long capturedBytes)
+    private void ConsumeLineBreak() => _skipLineFeed = _buffer[_position++] == '\r';
+
+    private void EnsureWithinLimit(long capturedBytes, long lineBytes)
     {
-        if (captureContent && capturedBytes > maximumBytes)
+        if (lineBytes > maximumBytes - capturedBytes)
         {
             throw new IOException($"Requested range exceeds the configured {maximumBytes}-byte limit.");
         }
+    }
+
+    private async ValueTask<bool> EnsureBufferedAsync(CancellationToken cancellationToken)
+    {
+        if (_position == _length)
+        {
+            _length = await reader.ReadAsync(_buffer.AsMemory(), cancellationToken).ConfigureAwait(false);
+            _position = 0;
+        }
+
+        return _length > 0;
     }
 }

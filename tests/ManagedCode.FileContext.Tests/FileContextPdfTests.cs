@@ -145,6 +145,9 @@ public sealed class FileContextPdfTests
         await Should.ThrowAsync<InvalidOperationException>(() => context.ExtractPdfImageAsync(PdfPath, 1, 2));
         await Should.ThrowAsync<ArgumentOutOfRangeException>(() => context.ExtractPdfImageAsync(PdfPath, 1, 0));
         await Should.ThrowAsync<FileNotFoundException>(() => context.ReadPdfTextAsync("missing.pdf"));
+        options.MaximumImageBytes = 1;
+        (await context.CountPdfPageImagesAsync(PdfPath, 1)).ShouldBe(1);
+        await Should.ThrowAsync<IOException>(() => context.ExtractPdfImageAsync(PdfPath, 1, 1));
     }
 
     [Fact]

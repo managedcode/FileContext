@@ -118,7 +118,7 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
     {
         var requests = await RunToolLoopAsync(
             LlmTestServerToolReplay.CreateResponse("timeout", FileContextToolNames.ReadRange, "{\"path\":\"slow.txt\",\"startLine\":2}"),
-            operationTimeout: TimeSpan.FromMilliseconds(1));
+            operationTimeout: TimeSpan.FromMilliseconds(10));
 
         foreach (var request in requests)
         {
@@ -146,7 +146,7 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
         await store.WriteAsync("second.txt", "second-content").ConfigureAwait(false);
         if (operationTimeout is not null)
         {
-            await store.WriteAsync("slow.txt", new string('a', 1_000_000)).ConfigureAwait(false);
+            storage.CreateSparseFile("slow.txt", 1L << 30);
         }
         var options = new FileContextOptions { RequireReadToolApproval = false, OperationTimeout = operationTimeout };
         store = new ManagedCodeStorageFileStore(storage.Storage, options);

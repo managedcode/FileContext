@@ -21,7 +21,8 @@ public static class FileContextTableReader
         FileContextTablesInfo result;
         if (string.Equals(Path.GetExtension(fileName), ".xlsx", StringComparison.OrdinalIgnoreCase))
         {
-            using var workbook = SpreadsheetDocument.Open(source, false);
+            using var workbook = SpreadsheetDocument.Open(source, false,
+                new OpenSettings { MaxCharactersInPart = options.MaximumOpenXmlPartCharacters });
             result = new(fileName, "xlsx", null, FileContextWorkbookTables.Read(workbook, headerRow, cancellationToken));
         }
         else { result = FileContextCsvTables.Read(source, fileName, headerRow, delimiter, cancellationToken); }

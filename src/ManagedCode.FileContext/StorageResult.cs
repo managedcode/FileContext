@@ -6,9 +6,9 @@ internal static class StorageResult
 {
     public static T GetValue<T>(Result<T> result, string operation)
     {
-        if (!result.IsSuccess || result.Value is null)
+        if (result.IsFailed)
         {
-            throw new IOException($"Storage operation '{operation}' failed: {result.Problem?.Detail ?? result.Problem?.Title ?? "unknown error"}.");
+            throw CreateException(operation, result.Problem.Detail ?? result.Problem.Title);
         }
 
         return result.Value;
@@ -16,9 +16,12 @@ internal static class StorageResult
 
     public static void EnsureSuccess<T>(Result<T> result, string operation)
     {
-        if (!result.IsSuccess)
+        if (result.IsFailed)
         {
-            throw new IOException($"Storage operation '{operation}' failed: {result.Problem?.Detail ?? result.Problem?.Title ?? "unknown error"}.");
+            throw CreateException(operation, result.Problem.Detail ?? result.Problem.Title);
         }
     }
+
+    private static IOException CreateException(string operation, string? detail) =>
+        new($"Storage operation '{operation}' failed: {detail ?? "unknown error"}.");
 }

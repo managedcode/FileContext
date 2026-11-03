@@ -37,6 +37,9 @@ public sealed class ManagedCodeStorageFileStoreTests
     [InlineData("../secret.txt")]
     [InlineData("docs/../../secret.txt")]
     [InlineData("/absolute.txt")]
+    [InlineData("  /absolute.txt  ")]
+    [InlineData("C:/absolute.txt")]
+    [InlineData("c:drive-relative.txt")]
     [InlineData("docs\\windows.txt")]
     [InlineData("docs//empty.txt")]
     [InlineData("")]
@@ -51,6 +54,20 @@ public sealed class ManagedCodeStorageFileStoreTests
         var store = new ManagedCodeStorageFileStore(scope.Storage);
 
         await Should.ThrowAsync<ArgumentException>(() => store.ReadAsync(path));
+    }
+
+    [Fact]
+    public async Task ListChildren_WhenUniqueEntriesExceedConfiguredLimit_FailsWithoutPartialResults()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var store = new ManagedCodeStorageFileStore(scope.Storage, new() { MaximumDirectoryEntries = 1 });
+        await store.WriteAsync("parent/first.txt", "first");
+        await store.WriteAsync("parent/second.txt", "second");
+
+        var singleDirectory = await store.ListChildrenAsync("");
+        singleDirectory.Select(static entry => entry.Name).ShouldBe(["parent"]);
+        var error = await Should.ThrowAsync<IOException>(() => store.ListChildrenAsync("parent"));
+        error.Message.ShouldContain(nameof(FileContextOptions.MaximumDirectoryEntries));
     }
 
     [Fact]

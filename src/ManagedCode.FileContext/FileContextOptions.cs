@@ -19,6 +19,10 @@ public sealed class FileContextOptions
 
     public long MaximumGeneratedFileBytes { get; set; } = FileContextDefaults.MaximumGeneratedFileBytes;
 
+    public int MaximumReportInputBytes { get; set; } = FileContextDefaults.MaximumReportInputBytes;
+
+    public int MaximumReportPages { get; set; } = FileContextDefaults.MaximumReportPages;
+
     public bool RequireReadToolApproval { get; set; } = true;
 
     public bool RequireWriteToolApproval { get; set; } = true;
@@ -59,6 +63,9 @@ public sealed class FileContextOptions
 
     public int MaximumDocxReadBytes { get; set; } = FileContextDefaults.MaximumDocxReadBytes;
 
+    /// <summary>Maximum decompressed XML characters in one Office document part.</summary>
+    public long MaximumOpenXmlPartCharacters { get; set; } = FileContextDefaults.MaximumOpenXmlPartCharacters;
+
     public long MaximumFullReadBytes { get; set; } = FileContextDefaults.MaximumFullReadBytes;
 
     public long MaximumRangeReadBytes { get; set; } = FileContextDefaults.MaximumRangeReadBytes;
@@ -68,6 +75,9 @@ public sealed class FileContextOptions
     public int MaximumRangeLineCount { get; set; } = FileContextDefaults.MaximumRangeLineCount;
 
     public int MaximumSearchFiles { get; set; } = FileContextDefaults.MaximumSearchFiles;
+
+    /// <summary>Maximum number of distinct direct children returned by one directory listing.</summary>
+    public int MaximumDirectoryEntries { get; set; } = FileContextDefaults.MaximumDirectoryEntries;
 
     public long MaximumSearchFileBytes { get; set; } = FileContextDefaults.MaximumSearchFileBytes;
 
@@ -91,6 +101,8 @@ public sealed class FileContextOptions
     internal void Validate()
     {
         ValidatePositive(MaximumGeneratedFileBytes, nameof(MaximumGeneratedFileBytes));
+        ValidatePositive(MaximumReportInputBytes, nameof(MaximumReportInputBytes));
+        ValidatePositive(MaximumReportPages, nameof(MaximumReportPages));
         ValidatePositive(MaximumPdfReadBytes, nameof(MaximumPdfReadBytes));
         ValidatePositive(PdfSourceBufferBytes, nameof(PdfSourceBufferBytes));
         if (PdfSourceStagingMode is not FileContextPdfSourceStagingMode.Automatic
@@ -118,11 +130,13 @@ public sealed class FileContextOptions
             throw new InvalidOperationException("PDF PNG quality must be between 0 and 100.");
         }
         ValidatePositive(MaximumDocxReadBytes, nameof(MaximumDocxReadBytes));
+        ValidatePositive(MaximumOpenXmlPartCharacters, nameof(MaximumOpenXmlPartCharacters));
         ValidatePositive(MaximumFullReadBytes, nameof(MaximumFullReadBytes));
         ValidatePositive(MaximumRangeReadBytes, nameof(MaximumRangeReadBytes));
         ValidatePositive(DefaultRangeLineCount, nameof(DefaultRangeLineCount));
         ValidatePositive(MaximumRangeLineCount, nameof(MaximumRangeLineCount));
         ValidatePositive(MaximumSearchFiles, nameof(MaximumSearchFiles));
+        ValidatePositive(MaximumDirectoryEntries, nameof(MaximumDirectoryEntries));
         ValidatePositive(MaximumSearchFileBytes, nameof(MaximumSearchFileBytes));
         ValidatePositive(MaximumSearchResults, nameof(MaximumSearchResults));
         ValidatePositive(MaximumMatchesPerFile, nameof(MaximumMatchesPerFile));

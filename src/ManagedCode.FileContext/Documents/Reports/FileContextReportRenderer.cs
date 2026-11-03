@@ -7,53 +7,58 @@ namespace ManagedCode.FileContext;
 
 internal static class FileContextReportRenderer
 {
-    private const int MaximumInputBytes = 10_000_000;
-    private const int MaximumPages = 60;
-
-    public static IReadOnlyList<FileContextReportOutput> Render(FileContextReport report, CancellationToken cancellationToken)
+    public static IReadOnlyList<FileContextReportOutput> Render(FileContextReport report, FileContextOptions options,
+        long maximumOutputBytes, CancellationToken token)
     {
-        Validate(report);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(60));
-        var token = timeout.Token;
+        Validate(report, options.MaximumReportInputBytes);
         var theme = report.Theme ?? new FileContextReportTheme();
-        var extension = Path.GetExtension(report.FileName);
+        var name = StoragePathScope.Normalize(report.FileName);
+        var extension = Path.GetExtension(name);
         var stem = string.Equals(extension, ".pdf", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(extension, ".html", StringComparison.OrdinalIgnoreCase)
-            ? report.FileName[..^extension.Length] : report.FileName;
+            ? name[..^extension.Length] : name;
         var outputs = new List<FileContextReportOutput>();
+        long retainedBytes = 0;
         foreach (var output in report.Outputs.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             token.ThrowIfCancellationRequested();
             switch (output.ToLowerInvariant())
             {
                 case "pdf":
-                    outputs.Add(new(stem + ".pdf", "application/pdf",
-                        FileContextReportPdf.Render(report, theme, MaximumPages, token)));
+                    AddOutput(stem + ".pdf", "application/pdf",
+                        FileContextReportPdf.Render(report, theme, options.MaximumReportPages, token));
                     break;
                 case "html":
-                    outputs.Add(new(stem + ".html", "text/html; charset=utf-8",
-                        Encoding.UTF8.GetBytes(FileContextReportHtml.Render(report, theme, token))));
+                    AddOutput(stem + ".html", "text/html; charset=utf-8",
+                        Encoding.UTF8.GetBytes(FileContextReportHtml.Render(report, theme, token)));
                     break;
                 case "png":
                     for (var index = 0; index < report.Blocks.Count; index++)
                     {
                         if (!string.Equals(report.Blocks[index].Type, "chart", StringComparison.Ordinal)) { continue; }
-                        try
-                        {
-                            outputs.Add(new($"{stem}-chart-{index + 1}.png", "image/png",
-                                FileContextReportChart.RenderPng(report.Blocks[index].Content, theme, token)));
-                        }
-                        catch (Exception error) when (error is not OperationCanceledException)
-                        { throw new ArgumentException($"blocks[{index}] (chart) failed: {error.Message}", nameof(report), error); }
+                        AddOutput($"{stem}-chart-{index + 1}.png", "image/png", RenderChart(report, index, theme, token));
                     }
                     break;
             }
         }
         return outputs;
+
+        void AddOutput(string fileName, string contentType, byte[] bytes)
+        {
+            retainedBytes += bytes.LongLength;
+            StorageFileCreator.EnsureWithinLimit(retainedBytes, maximumOutputBytes);
+            outputs.Add(new(fileName, contentType, bytes));
+        }
     }
 
-    private static void Validate(FileContextReport report)
+    private static byte[] RenderChart(FileContextReport report, int index, FileContextReportTheme theme, CancellationToken token)
+    {
+        try { return FileContextReportChart.RenderPng(report.Blocks[index].Content, theme, token); }
+        catch (Exception error) when (error is not OperationCanceledException and not OutOfMemoryException)
+        { throw new ArgumentException($"blocks[{index}] (chart) failed: {error.Message}", nameof(report), error); }
+    }
+
+    private static void Validate(FileContextReport report, int maximumInputBytes)
     {
         ArgumentNullException.ThrowIfNull(report);
         if (string.IsNullOrWhiteSpace(report.Title)) { throw new ArgumentException("title is required.", nameof(report)); }
@@ -63,8 +68,8 @@ internal static class FileContextReportRenderer
         { throw new ArgumentException("outputs must contain pdf, html, or png.", nameof(report)); }
         if (report.PageSize is not ("Letter" or "A4") || report.Orientation is not ("portrait" or "landscape"))
         { throw new ArgumentException("pageSize must be Letter or A4 and orientation must be portrait or landscape.", nameof(report)); }
-        if (JsonSerializer.SerializeToUtf8Bytes(report).Length > MaximumInputBytes)
-        { throw new ArgumentException($"Report input exceeds {MaximumInputBytes} bytes.", nameof(report)); }
+        if (JsonSerializer.SerializeToUtf8Bytes(report).Length > maximumInputBytes)
+        { throw new ArgumentException($"Report input exceeds {maximumInputBytes} bytes.", nameof(report)); }
         for (var index = 0; index < report.Blocks.Count; index++)
         {
             var block = report.Blocks[index];
@@ -73,6 +78,5 @@ internal static class FileContextReportRenderer
             if (block.Content.ValueKind is not (JsonValueKind.Object or JsonValueKind.Undefined))
             { throw new ArgumentException($"blocks[{index}].content must be an object.", nameof(report)); }
         }
-        StoragePathScope.Normalize(report.FileName);
     }
 }

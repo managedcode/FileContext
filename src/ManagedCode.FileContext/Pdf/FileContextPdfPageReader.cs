@@ -53,6 +53,10 @@ internal static class FileContextPdfPageReader
             }
 
             output.Append(letter.Value);
+            if (output.TextCut && output.HasTextLayer)
+            {
+                break;
+            }
             previous = letter;
             if (!string.IsNullOrWhiteSpace(letter.Value))
             {

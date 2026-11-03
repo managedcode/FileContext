@@ -57,6 +57,8 @@ sequenceDiagram
 - [`FileContextService`](https://github.com/managedcode/FileContext/tree/main/src/ManagedCode.FileContext) streams line windows and metadata, loads scoped Markdown through `IStorage`, builds a Markdown-LD knowledge graph, and maps results to package-owned records.
 - [`FileContextServiceCollectionExtensions`](https://github.com/managedcode/FileContext/tree/main/src/ManagedCode.FileContext) is the composition root for default and keyed `IStorage` registrations.
 
+`FileContextService` exceeds the 200-line type limit across its partial declarations. It keeps the existing file and PDF contracts on the same public facade, with separate source files for the PDF and file-listing entry points.
+
 ## Dependency rules
 
 ```mermaid
