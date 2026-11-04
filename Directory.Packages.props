@@ -22,8 +22,8 @@
     <PackageVersion Include="ManagedCode.LlmTestServer.Hosting" Version="1.0.6" />
     <PackageVersion Include="ManagedCode.LlmTestServer.OpenAI" Version="1.0.6" />
     <PackageVersion Include="ManagedCode.MarkdownLd.Kb" Version="0.3.3" />
-    <PackageVersion Include="ManagedCode.Storage.Core" Version="10.1.10" />
-    <PackageVersion Include="ManagedCode.Storage.FileSystem" Version="10.1.10" />
+    <PackageVersion Include="ManagedCode.Storage.Core" Version="10.1.12" />
+    <PackageVersion Include="ManagedCode.Storage.FileSystem" Version="10.1.12" />
     <PackageVersion Include="Microsoft.Agents.AI" Version="1.27.0" />
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.11.0" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.14" />
