@@ -2,6 +2,10 @@
 
 All notable changes to ManagedCode.FileContext are documented here.
 
+## 1.0.20
+
+- Keep report block content optional when exporting AI tool schemas and deserializing report inputs.
+
 ## 1.0.19
 
 - Apply file, result, page, concurrency, and timeout limits only when explicitly configured or requested. Default text and document reads return the remaining content.
