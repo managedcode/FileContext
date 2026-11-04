@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.AI;
 using UglyToad.PdfPig;
 
 namespace ManagedCode.FileContext.Tests;
@@ -14,9 +15,13 @@ public sealed class ReportInputValidationTests
         var options = new FileContextOptions { EnableWriteTools = true };
         var store = new ManagedCodeStorageFileStore(storage.Storage, options);
         var context = new FileContextService(store, options);
-        var pageBreak = JsonSerializer.Deserialize<FileContextReportBlock>("""{"Type":"page-break"}""", StrictJson)!;
-        var report = new FileContextReport("Report", "pages.pdf",
-            [pageBreak, new("text", JsonSerializer.SerializeToElement(new { text = "Second page" }))], ["pdf"]);
+        var function = AIFunctionFactory.Create(context.Documents.CreateReportAsync);
+        function.JsonSchema.GetRawText().ShouldContain("Content", Case.Insensitive);
+        var blocks = JsonSerializer.Deserialize<FileContextReportBlock[]>(
+            """[{"Type":"page-break"},{"Type":"text","Content":{"text":"Second page"}}]""", StrictJson)!;
+        blocks[0].Content.ValueKind.ShouldBe(JsonValueKind.Undefined);
+        blocks[1].Content.GetProperty("text").GetString().ShouldBe("Second page");
+        var report = new FileContextReport("Report", "pages.pdf", blocks, ["pdf"]);
 
         var result = await context.Documents.CreateReportAsync(report);
 
