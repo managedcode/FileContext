@@ -57,7 +57,7 @@ public sealed partial class FileContextService : IFileContext, IFileContextPdf
         }
 
         StorageTextPolicy.RequireText(StoragePathScope.Normalize(path));
-        if (await _fileStore.GetMetadataAsync(path, cancellationToken).ConfigureAwait(false) is null)
+        if (!await _fileStore.FileExistsInOperationAsync(path, cancellationToken).ConfigureAwait(false))
         {
             throw new FileNotFoundException($"File '{path}' was not found.", path);
         }

@@ -12,6 +12,19 @@ internal sealed class StorageFileCreator(IStorage storage, StoragePathScope path
         ArgumentNullException.ThrowIfNull(source);
         ArgumentException.ThrowIfNullOrWhiteSpace(mediaType);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumBytes);
+        if (source is MemoryStream memory && memory.GetType() == typeof(MemoryStream)
+            && memory.TryGetBuffer(out var bufferSegment))
+        {
+            var remaining = bufferSegment.Slice((int)Math.Min(memory.Position, bufferSegment.Count));
+            if (remaining.Count <= maximumBytes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using var payload = new MemoryStream(remaining.Array!, remaining.Offset, remaining.Count, writable: false);
+                memory.Position += remaining.Count;
+                return await UploadAsync(path, payload, mediaType, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
         using var buffer = new MemoryStream();
         using var bounded = new StorageReadBudgetStream(source, maximumBytes);
         await bounded.CopyToAsync(buffer, StorageReadBudgetStream.DefaultCopyBufferSize, cancellationToken).ConfigureAwait(false);

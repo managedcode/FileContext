@@ -14,16 +14,16 @@ internal static partial class FileContextReportHtml
     private static readonly Regex Bold = new(@"\*\*(?<text>.+?)\*\*", InlineRegexOptions, Regex.InfiniteMatchTimeout);
     private static readonly Regex Link = new(@"\[(?<text>[^\]]+)\]\((?<url>https://[^\s)]+)\)", InlineRegexOptions, Regex.InfiniteMatchTimeout);
 
-    public static string Render(FileContextReport report, FileContextReportTheme theme, CancellationToken token)
+    public static string Render(FileContextReport report, FileContextReportTheme theme, string? logoMediaType, CancellationToken token)
     {
         var html = new StringBuilder();
         html.Append("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">")
             .Append("<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data:; style-src 'unsafe-inline'\">")
             .Append("<title>").Append(E(report.Title)).Append("</title><style>")
             .Append(Style(theme, report)).Append("</style></head><body><header>");
-        if (theme.LogoBase64 is { Length: > 0 })
+        if (logoMediaType is not null)
         {
-            html.Append("<img class=\"mark\" alt=\"NYWD logo\" src=\"data:image/png;base64,")
+            html.Append("<img class=\"mark\" alt=\"NYWD logo\" src=\"data:").Append(logoMediaType).Append(";base64,")
                 .Append(theme.LogoBase64).Append("\">");
         }
         else { html.Append("<span class=\"mark\">NY</span>"); }

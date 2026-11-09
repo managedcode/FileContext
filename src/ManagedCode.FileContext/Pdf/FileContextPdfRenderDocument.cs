@@ -1,3 +1,4 @@
+using SkiaSharp;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Rendering.Skia;
 
@@ -42,10 +43,11 @@ public sealed class FileContextPdfRenderDocument : IDisposable
         {
             throw new ArgumentOutOfRangeException(nameof(scale));
         }
-        var page = _document.GetPage(pageNumber);
-        var width = page.Width * resolvedScale;
-        var height = page.Height * resolvedScale;
-        if (width > int.MaxValue || height > int.MaxValue)
+        var renderScale = (float)resolvedScale;
+        var pageSize = _document.GetPageSize(pageNumber);
+        var width = Math.Ceiling(pageSize.Width * renderScale);
+        var height = Math.Ceiling(pageSize.Height * renderScale);
+        if (width is not (> 0 and <= int.MaxValue) || height is not (> 0 and <= int.MaxValue))
         {
             throw new IOException("The rendered PDF page dimensions exceed the raster format's supported range.");
         }
@@ -53,9 +55,11 @@ public sealed class FileContextPdfRenderDocument : IDisposable
         {
             throw new IOException("The rendered PDF page exceeds the pixel limit.");
         }
-        FileContextPdfImageBudget.Validate(page, _options);
-        using var image = _document.GetPageAsPng(pageNumber, (float)resolvedScale, _options.PdfPngQuality);
-        if (image.Length > _options.MaximumImageBytes)
+        FileContextPdfImageBudget.Validate(_document.GetPage(pageNumber), _options);
+        using var bitmap = _document.GetPageAsSKBitmap(pageNumber, renderScale, SKColors.White);
+        using var image = bitmap.Encode(SKEncodedImageFormat.Png, _options.PdfPngQuality)
+            ?? throw new IOException("The rendered PDF page could not be encoded as PNG.");
+        if (image.Size > _options.MaximumImageBytes)
         {
             throw new IOException("The rendered PDF page exceeds the image byte limit.");
         }

@@ -16,6 +16,7 @@
     <PackageReference Include="PdfPig.Rendering.Skia" />
     <PackageReference Include="HarfBuzzSharp.NativeAssets.Linux" />
     <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.HarfBuzz" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
     <PackageReference Include="ManagedCode.Storage.Core" />
     <PackageReference Include="Microsoft.Agents.AI" />

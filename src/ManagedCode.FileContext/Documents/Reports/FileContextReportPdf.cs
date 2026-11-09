@@ -14,7 +14,7 @@ internal sealed class FileContextReportPdf : IDisposable
     private readonly CancellationToken token;
     private readonly int pageLimit;
     private readonly SKDocument document;
-    private readonly MemoryStream stream = new();
+    private readonly SKImage? logo;
     private SKCanvas canvas = null!;
     private readonly float pageWidth;
     private readonly float pageHeight;
@@ -30,21 +30,25 @@ internal sealed class FileContextReportPdf : IDisposable
     private const float ContentTop = 93;
     private const float FooterTop = 52;
 
-    private FileContextReportPdf(FileContextReport report, FileContextReportTheme theme, int pageLimit, CancellationToken token)
+    private FileContextReportPdf(FileContextReport report, FileContextReportTheme theme, SKImage? logo, SKWStream destination,
+        int pageLimit, CancellationToken token)
     {
         this.report = report;
         this.theme = theme;
+        this.logo = logo;
         this.pageLimit = pageLimit;
         this.token = token;
         pageWidth = string.Equals(report.PageSize, "A4", StringComparison.Ordinal) ? 595 : 612;
         pageHeight = string.Equals(report.PageSize, "A4", StringComparison.Ordinal) ? 842 : 792;
         if (string.Equals(report.Orientation, "landscape", StringComparison.Ordinal)) { (pageWidth, pageHeight) = (pageHeight, pageWidth); }
-        document = SKDocument.CreatePdf(stream) ?? throw new InvalidOperationException("PDF renderer could not start.");
+        document = SKDocument.CreatePdf(destination) ?? throw new InvalidOperationException("PDF renderer could not start.");
     }
 
-    public static byte[] Render(FileContextReport report, FileContextReportTheme theme, int pageLimit, CancellationToken token)
+    public static byte[] Render(FileContextReport report, FileContextReportTheme theme, byte[]? logoBytes, int pageLimit, CancellationToken token)
     {
-        using var renderer = new FileContextReportPdf(report, theme, pageLimit, token);
+        using var headerLogo = FileContextReportImage.DecodeLogo(logoBytes);
+        using var destination = new SKDynamicMemoryWStream();
+        using var renderer = new FileContextReportPdf(report, theme, headerLogo, destination, pageLimit, token);
         renderer.NewPage();
         for (var index = 0; index < report.Blocks.Count; index++)
         {
@@ -55,7 +59,8 @@ internal sealed class FileContextReportPdf : IDisposable
         }
         renderer.document.EndPage();
         renderer.document.Close();
-        return renderer.stream.ToArray();
+        using var bytes = destination.DetachAsData();
+        return bytes.ToArray();
     }
 
     internal void NewPage()
@@ -67,11 +72,9 @@ internal sealed class FileContextReportPdf : IDisposable
         using var primary = ReportCanvas.Paint(ReportCanvas.Parse(theme.Primary), 17);
         using var accent = ReportCanvas.Paint(ReportCanvas.Parse(theme.Accent));
         using var muted = ReportCanvas.Paint(ReportCanvas.Parse(theme.Muted), 9);
-        if (theme.LogoBase64 is { Length: > 0 })
+        if (logo is not null)
         {
-            using var logo = SKBitmap.Decode(Convert.FromBase64String(theme.LogoBase64))
-                ?? throw new ArgumentException("Theme logo must be PNG or JPEG.");
-            canvas.DrawBitmap(logo, new SKRect(Margin, 26, Margin + 31, 57), new SKSamplingOptions(SKFilterMode.Linear));
+            canvas.DrawImage(logo, new SKRect(Margin, 26, Margin + 31, 57), new SKSamplingOptions(SKFilterMode.Linear));
         }
         else
         {
@@ -201,9 +204,5 @@ internal sealed class FileContextReportPdf : IDisposable
         Y += height + 10;
     }
 
-    public void Dispose()
-    {
-        document.Dispose();
-        stream.Dispose();
-    }
+    public void Dispose() => document.Dispose();
 }

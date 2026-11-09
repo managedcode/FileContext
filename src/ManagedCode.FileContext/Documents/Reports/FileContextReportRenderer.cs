@@ -12,6 +12,8 @@ internal static class FileContextReportRenderer
     {
         Validate(report, options.MaximumReportInputBytes, token);
         var theme = report.Theme ?? new FileContextReportTheme();
+        var logo = ReadLogo(report, theme);
+        var logoMediaType = logo is null ? null : FileContextReportImage.Validate(logo);
         var name = StoragePathScope.Normalize(report.FileName);
         var extension = Path.GetExtension(name);
         var stem = string.Equals(extension, ".pdf", StringComparison.OrdinalIgnoreCase) ||
@@ -26,11 +28,11 @@ internal static class FileContextReportRenderer
             {
                 case "pdf":
                     AddOutput(stem + ".pdf", "application/pdf",
-                        FileContextReportPdf.Render(report, theme, options.MaximumReportPages, token));
+                        FileContextReportPdf.Render(report, theme, logo, options.MaximumReportPages, token));
                     break;
                 case "html":
                     AddOutput(stem + ".html", "text/html; charset=utf-8",
-                        Encoding.UTF8.GetBytes(FileContextReportHtml.Render(report, theme, token)));
+                        Encoding.UTF8.GetBytes(FileContextReportHtml.Render(report, theme, logoMediaType, token)));
                     break;
                 case "png":
                     for (var index = 0; index < report.Blocks.Count; index++)
@@ -48,6 +50,20 @@ internal static class FileContextReportRenderer
             retainedBytes += bytes.LongLength;
             StorageFileCreator.EnsureWithinLimit(retainedBytes, maximumOutputBytes);
             outputs.Add(new(fileName, contentType, bytes));
+        }
+    }
+
+    private static byte[]? ReadLogo(FileContextReport report, FileContextReportTheme theme)
+    {
+        if (theme.LogoBase64 is not { Length: > 0 } value || !report.Outputs.Any(static output => output is "pdf" or "html"))
+        {
+            return null;
+        }
+
+        try { return Convert.FromBase64String(value); }
+        catch (FormatException error)
+        {
+            throw new ArgumentException("Theme logo must be a base64-encoded PNG or JPEG.", nameof(report), error);
         }
     }
 

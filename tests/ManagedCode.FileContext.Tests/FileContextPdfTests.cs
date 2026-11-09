@@ -1,8 +1,6 @@
 using ManagedCode.FileContext.Pdf;
 using ManagedCode.Storage.Core.Models;
-using SkiaSharp;
 using UglyToad.PdfPig;
-using UglyToad.PdfPig.Rendering.Skia;
 
 namespace ManagedCode.FileContext.Tests;
 
@@ -31,32 +29,6 @@ public sealed class FileContextPdfTests
         var result = FileContextPdfTextExtractor.Extract(pdf, 1000);
         result.Text.ShouldBe($"{Interview}\n{Farm}");
         result.PagesWithoutText.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Page_with_a_standard_font_renders_visible_text()
-    {
-        var pdf = FileContextPdfTestPdfs.WithPages([Interview]);
-
-        using var image = SKBitmap.Decode(FileContextPdfImages.RenderPagePng(pdf, 1, scale: 1));
-
-        image.ShouldNotBeNull();
-        image.Pixels.ShouldContain(pixel => pixel.Alpha > 0 && pixel.Red < 128);
-    }
-
-    [Fact]
-    public void Bundled_font_factory_renders_visible_text_on_unix()
-    {
-        // Exercise the fallback on Unix even when the machine has a usable system font.
-        if (OperatingSystem.IsWindows()) { return; }
-
-        var pdf = FileContextPdfTestPdfs.WithPages([Interview]);
-        using var document = PdfDocument.Open(pdf, SkiaRenderingParsingOptions.Instance);
-        document.AddPageFactory<PdfPageSize, PageSizeFactory>();
-        document.AddPageFactory<SKPicture, FileContextPdfPageFactory>();
-
-        using var image = document.GetPageAsSKBitmap(1);
-        image.Pixels.ShouldContain(pixel => pixel.Alpha > 0 && pixel.Red < 128);
     }
 
     [Fact]

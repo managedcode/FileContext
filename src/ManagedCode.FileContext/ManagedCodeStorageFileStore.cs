@@ -58,7 +58,7 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
         => FileContextOperation.RunAsync(_options.OperationTimeout, token => ListChildrenOperationAsync(directory, token), cancellationToken);
 
     public override Task<bool> FileExistsAsync(string path, CancellationToken cancellationToken = default)
-        => FileContextOperation.RunAsync(_options.OperationTimeout, token => FileExistsOperationAsync(path, token), cancellationToken);
+        => FileContextOperation.RunAsync(_options.OperationTimeout, token => FileExistsInOperationAsync(path, token), cancellationToken);
 
     public override Task<IReadOnlyList<FileSearchResult>> SearchAsync(
         string directory, string regexPattern, string? globPattern = null, bool recursive = false, CancellationToken cancellationToken = default)
@@ -122,10 +122,8 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
             normalizedDirectory, _options.MaximumDirectoryEntries, cancellationToken);
     }
 
-    private Task<bool> FileExistsOperationAsync(string path, CancellationToken cancellationToken = default)
-    {
-        return ExistsCoreAsync(_paths.ToStoragePath(path), cancellationToken);
-    }
+    internal Task<bool> FileExistsInOperationAsync(string path, CancellationToken cancellationToken) =>
+        ExistsCoreAsync(_paths.ToStoragePath(path), cancellationToken);
 
     private Task<IReadOnlyList<FileSearchResult>> SearchOperationAsync(
         string directory,

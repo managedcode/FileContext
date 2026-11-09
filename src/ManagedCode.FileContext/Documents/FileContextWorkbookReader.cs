@@ -55,7 +55,7 @@ internal static class FileContextWorkbookReader
             ?? throw new ArgumentException("The requested worksheet does not exist.", nameof(sheetName));
         var worksheet = workbook.GetPartById(sheet.Id!) as WorksheetPart
             ?? throw new InvalidDataException("The requested sheet is not a worksheet.");
-        var strings = ReadSharedStrings(workbook);
+        var strings = DeferSharedStrings(workbook);
         var cells = ReadCells(worksheet, strings, startRow, rowCount, startColumn, columnCount, byteLimit, token);
         var range = $"{ColumnName(startColumn)}{startRow}:{ColumnName(startColumn + columnCount - 1)}{startRow + rowCount - 1}";
         return new(path, sheetName, range, cells);
@@ -69,7 +69,7 @@ internal static class FileContextWorkbookReader
         { throw new ArgumentOutOfRangeException(nameof(columnCount), "The range must fit Excel's 16384 columns, starting at one."); }
     }
 
-    private static List<FileContextWorkbookCell> ReadCells(WorksheetPart worksheet, string[] strings,
+    private static List<FileContextWorkbookCell> ReadCells(WorksheetPart worksheet, Lazy<string[]> strings,
         int startRow, int rowCount, int startColumn, int columnCount, long byteLimit, CancellationToken token)
     {
         using var reader = OpenXmlReader.Create(worksheet);
@@ -128,7 +128,7 @@ internal static class FileContextWorkbookReader
         return previous + 1;
     }
 
-    private static FileContextWorkbookCell ReadCell(Cell cell, string[] strings, string address)
+    private static FileContextWorkbookCell ReadCell(Cell cell, Lazy<string[]> strings, string address)
     {
         var type = cell.DataType?.Value;
         var value = ReadCellValue(cell, strings, type);
@@ -141,18 +141,20 @@ internal static class FileContextWorkbookReader
         return new(address, kind, value, cell.CellFormula?.Text);
     }
 
-    internal static string ReadCellValue(Cell cell, string[] strings, CellValues? type)
+    internal static string ReadCellValue(Cell cell, Lazy<string[]> strings, CellValues? type)
     {
         if (type == CellValues.InlineString) { return ReadBaseText(cell.InlineString); }
         var value = cell.CellValue?.Text ?? string.Empty;
         if (type != CellValues.SharedString) { return value; }
-        if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var index) || index < 0 || index >= strings.Length)
+        var sharedStrings = strings.Value;
+        if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var index) || index < 0 || index >= sharedStrings.Length)
         { throw new InvalidDataException("Workbook cell contains an invalid shared-string reference."); }
-        return strings[index];
+        return sharedStrings[index];
     }
 
-    internal static string[] ReadSharedStrings(WorkbookPart workbook) =>
-        workbook.SharedStringTablePart?.SharedStringTable?.Elements<SharedStringItem>().Select(ReadBaseText).ToArray() ?? [];
+    internal static Lazy<string[]> DeferSharedStrings(WorkbookPart workbook) =>
+        new(() => workbook.SharedStringTablePart?.SharedStringTable?.Elements<SharedStringItem>()
+            .Select(ReadBaseText).ToArray() ?? []);
 
     private static string ReadBaseText(RstType? value)
     {

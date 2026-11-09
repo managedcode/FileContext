@@ -1,3 +1,5 @@
+using SkiaSharp;
+
 namespace ManagedCode.FileContext;
 
 internal static class FileContextReportImage
@@ -5,6 +7,15 @@ internal static class FileContextReportImage
     private const int MinimumImageBytes = 8;
     private static readonly byte[] PngSignature = [137, 80, 78, 71];
     private static readonly byte[] JpegSignature = [255, 216];
+
+    public static SKImage? DecodeLogo(byte[]? bytes)
+    {
+        if (bytes is null) { return null; }
+
+        using var bitmap = SKBitmap.Decode(bytes) ?? throw new ArgumentException("Theme logo must be PNG or JPEG.", nameof(bytes));
+        bitmap.SetImmutable();
+        return SKImage.FromBitmap(bitmap);
+    }
 
     public static string Validate(byte[] bytes)
     {
