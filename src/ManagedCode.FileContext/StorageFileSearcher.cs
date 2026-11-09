@@ -99,7 +99,7 @@ internal sealed class StorageFileSearcher(
         using var bounded = options.MaximumSearchFileBytes == long.MaxValue
             ? null : new StorageReadBudgetStream(stream, options.MaximumSearchFileBytes);
         using var reader = new StreamReader(bounded ?? stream, Encoding.UTF8, true, leaveOpen: true);
-        var lineReader = new StorageTextLineReader(reader, long.MaxValue);
+        using var lineReader = new StorageTextLineReader(reader, long.MaxValue);
         ArrayBufferWriter<char>? splitLine = null;
         var matches = new List<FileSearchMatch>();
         var lineNumber = 0;

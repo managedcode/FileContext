@@ -15,7 +15,7 @@ internal static class FileContextWorkbookTables
     {
         if (headerRow > MaximumRows) { throw new ArgumentOutOfRangeException(nameof(headerRow)); }
         var workbook = document.WorkbookPart ?? throw new InvalidDataException("The package has no Excel workbook.");
-        var strings = FileContextWorkbookReader.DeferSharedStrings(workbook);
+        var strings = new FileContextSharedStrings(workbook.SharedStringTablePart, token);
         var result = new List<FileContextTableInfo>();
         foreach (var sheet in workbook.Workbook?.Sheets?.Elements<Sheet>() ?? [])
         {
@@ -46,7 +46,7 @@ internal static class FileContextWorkbookTables
             table.TableColumns?.Elements<TableColumn>().Select(static column => column.Name?.Value ?? string.Empty).ToArray() ?? []);
     }
 
-    private static FileContextTableInfo Inspect(WorksheetPart part, Lazy<string[]> strings, TableBounds bounds, CancellationToken token)
+    private static FileContextTableInfo Inspect(WorksheetPart part, FileContextSharedStrings strings, TableBounds bounds, CancellationToken token)
     {
         var accumulator = new TableAccumulator(bounds);
         using var reader = OpenXmlReader.Create(part);

@@ -3,9 +3,10 @@ using System.Text;
 
 namespace ManagedCode.FileContext;
 
-internal sealed class StorageTextLineReader(StreamReader reader, long maximumBytes)
+internal sealed class StorageTextLineReader(StreamReader reader, long maximumBytes) : IDisposable
 {
-    private readonly char[] _buffer = new char[4_096];
+    private const int BufferLength = 4_096;
+    private char[] _buffer = ArrayPool<char>.Shared.Rent(BufferLength);
     private int _position;
     private int _length;
     private bool _skipLineFeed;
@@ -100,10 +101,20 @@ internal sealed class StorageTextLineReader(StreamReader reader, long maximumByt
     {
         if (_position == _length)
         {
-            _length = await reader.ReadAsync(_buffer.AsMemory(), cancellationToken).ConfigureAwait(false);
+            _length = await reader.ReadAsync(_buffer.AsMemory(0, BufferLength), cancellationToken).ConfigureAwait(false);
             _position = 0;
         }
 
         return _length > 0;
+    }
+
+    public void Dispose()
+    {
+        var buffer = _buffer;
+        _buffer = [];
+        if (buffer.Length != 0)
+        {
+            ArrayPool<char>.Shared.Return(buffer, clearArray: true);
+        }
     }
 }

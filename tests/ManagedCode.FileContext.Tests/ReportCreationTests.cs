@@ -199,6 +199,7 @@ public sealed class ReportCreationTests
         var lines = ReportCanvas.Wrap("WW\r\nWWW\n\nЇ😀", paint, width);
 
         lines.ShouldBe(["WW", "WW", "W", "", "Ї😀"]);
+        ReportCanvas.Wrap("😀😀", paint, 0).ShouldBe(["😀", "😀"]);
     }
 
     [Fact]

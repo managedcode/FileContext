@@ -58,7 +58,7 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
         => FileContextOperation.RunAsync(_options.OperationTimeout, token => ListChildrenOperationAsync(directory, token), cancellationToken);
 
     public override Task<bool> FileExistsAsync(string path, CancellationToken cancellationToken = default)
-        => FileContextOperation.RunAsync(_options.OperationTimeout, token => FileExistsInOperationAsync(path, token), cancellationToken);
+        => FileContextOperation.RunAsync(_options.OperationTimeout, token => FileExistsOperationAsync(path, token), cancellationToken);
 
     public override Task<IReadOnlyList<FileSearchResult>> SearchAsync(
         string directory, string regexPattern, string? globPattern = null, bool recursive = false, CancellationToken cancellationToken = default)
@@ -122,7 +122,7 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
             normalizedDirectory, _options.MaximumDirectoryEntries, cancellationToken);
     }
 
-    internal Task<bool> FileExistsInOperationAsync(string path, CancellationToken cancellationToken) =>
+    private Task<bool> FileExistsOperationAsync(string path, CancellationToken cancellationToken) =>
         ExistsCoreAsync(_paths.ToStoragePath(path), cancellationToken);
 
     private Task<IReadOnlyList<FileSearchResult>> SearchOperationAsync(
@@ -146,8 +146,9 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
         FileContextOperation.RunAsync(_options.OperationTimeout, token => OpenReadInOperationAsync(path, token),
             cancellationToken, static stream => stream.DisposeAsync());
 
-    internal Task<Stream> OpenReadInOperationAsync(string path, CancellationToken cancellationToken) =>
-        OpenReadCoreAsync(_paths.ToStoragePath(path), cancellationToken);
+    internal Task<Stream> OpenReadInOperationAsync(string path, CancellationToken cancellationToken,
+        bool reportMissingFile = false) =>
+        OpenReadCoreAsync(_paths.ToStoragePath(path), cancellationToken, reportMissingFile ? path : null);
 
     internal async Task<BlobMetadata?> GetMetadataAsync(string path, CancellationToken cancellationToken)
     {
@@ -184,9 +185,16 @@ public sealed class ManagedCodeStorageFileStore : AgentFileStore
         return StorageResult.GetValue(result, $"metadata {storagePath}");
     }
 
-    private async Task<Stream> OpenReadCoreAsync(string storagePath, CancellationToken cancellationToken)
+    private async Task<Stream> OpenReadCoreAsync(string storagePath, CancellationToken cancellationToken,
+        string? missingFilePath = null)
     {
         var result = await _storage.GetStreamAsync(storagePath, cancellationToken).ConfigureAwait(false);
+        if (result.IsFailed && missingFilePath is not null
+            && !await ExistsCoreAsync(storagePath, cancellationToken).ConfigureAwait(false))
+        {
+            throw new FileNotFoundException($"File '{missingFilePath}' was not found.", missingFilePath);
+        }
+
         return StorageResult.GetValue(result, $"read {storagePath}");
     }
 

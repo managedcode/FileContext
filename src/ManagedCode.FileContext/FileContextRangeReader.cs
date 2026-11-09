@@ -12,7 +12,7 @@ internal sealed class FileContextRangeReader(long maximumBytes)
         CancellationToken cancellationToken)
     {
         var builder = new StringBuilder();
-        var lineReader = new StorageTextLineReader(reader, maximumBytes);
+        using var lineReader = new StorageTextLineReader(reader, maximumBytes);
         var currentLine = 0;
         var linesAdded = 0;
         var bytesAdded = 0L;

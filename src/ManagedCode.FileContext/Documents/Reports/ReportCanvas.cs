@@ -9,7 +9,6 @@ namespace ManagedCode.FileContext;
 internal static class ReportCanvas
 {
     private const float BoldStrokeWidth = .35f;
-    private const int SingleMeasurementLength = 256;
     private static readonly Lazy<SKTypeface> Typeface = new(() =>
     {
         using var stream = BundledDocumentFont.Open();
@@ -53,25 +52,26 @@ internal static class ReportCanvas
         var lines = new List<string>();
         foreach (var paragraph in value.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n'))
         {
-            if (paragraph.Length <= SingleMeasurementLength && Ascii.IsValid(paragraph) && MeasureText(paragraph, paint) <= width)
+            var remaining = paragraph.AsSpan();
+            do
             {
-                lines.Add(paragraph);
-                continue;
-            }
-
-            var start = 0;
-            var position = 0;
-            foreach (var rune in paragraph.EnumerateRunes())
-            {
-                var end = position + rune.Utf16SequenceLength;
-                if (position > start && paint.Font.MeasureText(paragraph.AsSpan(start, end - start), paint.ColorPaint) > width)
+                var length = paint.Font.BreakText(remaining, width, paint.ColorPaint);
+                if (length == paragraph.Length)
                 {
-                    lines.Add(paragraph[start..position]);
-                    start = position;
+                    lines.Add(paragraph);
+                    break;
                 }
-                position = end;
+
+                if (length == 0 && !remaining.IsEmpty)
+                {
+                    // Always emit a complete rune even if that rune is wider than the column.
+                    Rune.DecodeFromUtf16(remaining, out _, out length);
+                }
+
+                lines.Add(remaining[..length].ToString());
+                remaining = remaining[length..];
             }
-            lines.Add(paragraph[start..]);
+            while (!remaining.IsEmpty);
         }
         return lines;
     }
