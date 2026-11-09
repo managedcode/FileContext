@@ -33,23 +33,16 @@ internal static class FileContextDocxReader
 
             var paragraph = reader.LoadCurrentElement() as Paragraph
                 ?? throw new InvalidDataException("A DOCX paragraph could not be read.");
-            var text = ReadParagraphText(paragraph, cancellationToken);
             var offset = number == startParagraph ? startCharacter : 0;
-            if (offset > text.Length || SplitsSurrogatePair(text, offset))
+            var (text, hasMore) = ReadParagraphWindow(paragraph, offset, remaining, cancellationToken);
+            if (text.Length > 0 || !hasMore)
             {
-                throw new ArgumentOutOfRangeException(nameof(startCharacter),
-                    "The character offset must be within this paragraph and at a Unicode character boundary.");
+                paragraphs.Add(new FileContextDocxParagraph(number, offset, text));
             }
-            var length = (int)Math.Min(text.Length - offset, remaining);
-            if (SplitsSurrogatePair(text, offset + length)) { length--; }
-            if (length > 0 || offset == text.Length)
+            remaining -= text.Length;
+            if (hasMore)
             {
-                paragraphs.Add(new FileContextDocxParagraph(number, offset, text.Substring(offset, length)));
-            }
-            remaining -= length;
-            if (offset + length < text.Length)
-            {
-                return new FileContextDocxText(path, paragraphs, number, offset + length);
+                return new FileContextDocxText(path, paragraphs, number, offset + text.Length);
             }
             reader.Read();
         }
@@ -57,21 +50,52 @@ internal static class FileContextDocxReader
         return new FileContextDocxText(path, paragraphs, null, 0);
     }
 
-    private static string ReadParagraphText(Paragraph paragraph, CancellationToken token)
+    private static (string Text, bool HasMore) ReadParagraphWindow(
+        Paragraph paragraph, int startCharacter, long limit, CancellationToken token)
     {
         var text = new StringBuilder();
+        var skip = startCharacter;
+        var lookahead = limit == long.MaxValue ? limit : limit + 1;
+        var lastSkipped = '\0';
         foreach (var element in paragraph.Descendants())
         {
             token.ThrowIfCancellationRequested();
-            switch (element)
+            var fragment = element switch
             {
-                case TabChar or PositionalTab: text.Append('\t'); break;
-                case Break or CarriageReturn: text.Append('\n'); break;
-                case { HasChildren: false }: text.Append(element.InnerText); break;
+                TabChar or PositionalTab => "\t",
+                Break or CarriageReturn => "\n",
+                { HasChildren: false } => element.InnerText,
+                _ => string.Empty
+            };
+
+            var start = Math.Min(skip, fragment.Length);
+            if (start > 0)
+            {
+                skip -= start;
+                lastSkipped = fragment[start - 1];
+            }
+            if (start == fragment.Length) { continue; }
+            if (text.Length == 0 && char.IsSurrogatePair(lastSkipped, fragment[start]))
+            {
+                throw InvalidOffset(nameof(startCharacter));
+            }
+
+            var length = (int)Math.Min(fragment.Length - start, lookahead - text.Length);
+            text.Append(fragment, start, length);
+            if (text.Length > limit)
+            {
+                var end = text.Length - 1;
+                if (char.IsSurrogatePair(text[end - 1], text[end])) { end--; }
+                return (text.ToString(0, end), true);
             }
         }
-        return text.ToString();
+
+        if (skip > 0) { throw InvalidOffset(nameof(startCharacter)); }
+        return (text.ToString(), false);
     }
+
+    private static ArgumentOutOfRangeException InvalidOffset(string parameterName) =>
+        new(parameterName, "The character offset must be within this paragraph and at a Unicode character boundary.");
 
     private static bool MoveToParagraph(OpenXmlReader reader, CancellationToken token)
     {
@@ -86,7 +110,4 @@ internal static class FileContextDocxReader
         }
         return false;
     }
-
-    private static bool SplitsSurrogatePair(string text, int index) =>
-        index > 0 && index < text.Length && char.IsSurrogatePair(text, index - 1);
 }

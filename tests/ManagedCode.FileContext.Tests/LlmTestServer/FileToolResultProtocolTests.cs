@@ -1,10 +1,6 @@
-using System.ClientModel;
 using System.Text.Json;
-using ManagedCode.LlmTestServer.Configuration;
-using ManagedCode.LlmTestServer.Models;
 using Microsoft.Agents.AI;
-using Microsoft.Extensions.AI;
-using OpenAI;
+using static ManagedCode.FileContext.Tests.LlmTestServer.FileToolResultProtocolFixture;
 
 namespace ManagedCode.FileContext.Tests.LlmTestServer;
 
@@ -127,53 +123,33 @@ public sealed class FileToolResultProtocolTests(Xunit.Abstractions.ITestOutputHe
         }
     }
 
-    private static async Task<string[]> RunToolLoopAsync(string replay, bool concurrent = false, string finalResponse = "Inspection completed.", TimeSpan? operationTimeout = null)
+    [Fact]
+    public async Task Restored_session_keeps_docx_cursor_and_closes_new_docx_and_csv_calls()
     {
-        const string prompt = "Inspect the files.";
-        LlmTestServerToolReplay.Reset();
-        var host = new LlmTestServerTestHost(() => new LlmTestServerConfigurationBuilder()
-            .AddModel(FileContextAgentLlmTestServerTests.Model, LlmTestServerModelKind.Chat)
-            .AddChatScenario("protocol", scenario => scenario.ForModel(FileContextAgentLlmTestServerTests.Model)
-                .WhenUserContains(prompt).Responds(replay).Responds(finalResponse).Responds("Follow-up completed."))
-            .Build());
-        await using var hostLifetime = host.ConfigureAwait(false);
-        await host.StartAsync().ConfigureAwait(false);
-        var storage = await TestStorageScope.CreateAsync().ConfigureAwait(false);
-        await using var storageLifetime = storage.ConfigureAwait(false);
-        var store = new ManagedCodeStorageFileStore(storage.Storage);
-        await store.WriteAsync("empty.txt", string.Empty).ConfigureAwait(false);
-        await store.WriteAsync("first.txt", "first-content").ConfigureAwait(false);
-        await store.WriteAsync("second.txt", "second-content").ConfigureAwait(false);
-        if (operationTimeout is not null)
-        {
-            storage.CreateSparseFile("slow.txt", 1L << 30);
-        }
-        var options = new FileContextOptions { RequireReadToolApproval = false, OperationTimeout = operationTimeout };
-        store = new ManagedCodeStorageFileStore(storage.Storage, options);
-        using var provider = new FileContextProvider(store, new FileContextService(store, options), options);
-        var sdk = new OpenAIClient(new ApiKeyCredential("not-required-by-llm-test-server"),
-            new OpenAIClientOptions { Endpoint = LlmTestServerToolReplay.CreateRouteUri(host.Endpoint) });
-        using var client = sdk.GetChatClient(FileContextAgentLlmTestServerTests.Model).AsIChatClient().AsBuilder()
-            .UseAIContextProviders(provider)
-            .UseFunctionInvocation(configure: options => options.AllowConcurrentInvocation = concurrent).Build();
-        var agent = new ChatClientAgent(client, new ChatClientAgentOptions { UseProvidedChatClientAsIs = true });
+        var first = LlmTestServerToolReplay.CreateResponse("docx-first", FileContextToolNames.DocxText, """{"path":"chapter.docx"}""");
+        var next = LlmTestServerToolReplay.CreateResponse("docx-next", FileContextToolNames.DocxText,
+            """{"path":"chapter.docx","startParagraph":1,"startCharacter":4}""");
+        var csv = LlmTestServerToolReplay.CreateResponse("csv", FileContextToolNames.TablesInfo, """{"path":"ledger.csv"}""");
 
-        await RunSessionRoundTripAsync(agent, prompt, finalResponse).ConfigureAwait(false);
-        LlmTestServerToolReplay.RecordedRequests.Count.ShouldBe(3);
-        var assertions = await host.GetAssertionsAsync().ConfigureAwait(false);
-        assertions.Matched.ShouldBe(3);
-        assertions.Unmatched.ShouldBe(0);
-        return LlmTestServerToolReplay.RecordedRequests.Skip(1).ToArray();
+        var requests = await RunToolLoopAsync(first, officeFollowUp: $"[{next},{csv}]");
+
+        var firstResult = LlmTestServerToolAssertions.AssertClosedCalls(requests[0], "docx-first").Single();
+        var restoredInput = LlmTestServerToolAssertions.AssertClosedCalls(requests[1], "docx-first").Single();
+        restoredInput.GetProperty("content").GetString().ShouldBe(firstResult.GetProperty("content").GetString());
+        using var initial = JsonDocument.Parse(firstResult.GetProperty("content").GetString()!);
+        initial.RootElement.GetProperty("nextCharacter").GetInt32().ShouldBe(4);
+        initial.RootElement.GetProperty("paragraphs")[0].GetProperty("text").GetString().ShouldBe("ABCD");
+
+        var results = LlmTestServerToolAssertions.AssertClosedCalls(requests[2], "docx-first", "docx-next", "csv");
+        using var continuation = ParseToolResult(results, "docx-next");
+        continuation.RootElement.GetProperty("paragraphs")[0].GetProperty("text").GetString().ShouldBe("🧪尾");
+        using var metadata = ParseToolResult(results, "csv");
+        var table = metadata.RootElement.GetProperty("tables")[0];
+        table.GetProperty("headers").EnumerateArray().Select(header => header.GetString()).ShouldBe(["Label", "Count"]);
+        table.GetProperty("rowCount").GetInt32().ShouldBe(2);
     }
 
-    private static async Task RunSessionRoundTripAsync(ChatClientAgent agent, string prompt, string finalResponse)
-    {
-        var session = await agent.CreateSessionAsync().ConfigureAwait(false);
-        var response = await agent.RunAsync(prompt, session).ConfigureAwait(false);
-        response.Text.ShouldBe(finalResponse);
-        var saved = await agent.SerializeSessionAsync(session).ConfigureAwait(false);
-        var restored = await agent.DeserializeSessionAsync(saved).ConfigureAwait(false);
-        var followUp = await agent.RunAsync("Continue the inspection.", restored).ConfigureAwait(false);
-        followUp.Text.ShouldBe("Follow-up completed.");
-    }
+    private static JsonDocument ParseToolResult(IEnumerable<JsonElement> results, string id) =>
+        JsonDocument.Parse(results.Single(result => string.Equals(result.GetProperty("tool_call_id").GetString(), id, StringComparison.Ordinal))
+            .GetProperty("content").GetString()!);
 }

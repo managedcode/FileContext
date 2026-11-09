@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text;
 
 namespace ManagedCode.FileContext;
@@ -18,19 +19,24 @@ internal static class StorageTextReader
             return await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        var buffer = new char[CharacterBufferLength];
-        var builder = new StringBuilder();
-        var counter = new Utf8ByteCounter();
-
-        while (await reader.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false) is var read && read > 0)
+        var buffer = ArrayPool<char>.Shared.Rent(CharacterBufferLength);
+        try
         {
-            counter.Append(buffer.AsSpan(0, read));
-            EnsureWithinLimit(counter.TotalBytes, limit);
-
-            builder.Append(buffer, 0, read);
+            var builder = new StringBuilder();
+            var counter = new Utf8ByteCounter();
+            var window = buffer.AsMemory(0, CharacterBufferLength);
+            while (await reader.ReadAsync(window, cancellationToken).ConfigureAwait(false) is var read && read > 0)
+            {
+                counter.Append(buffer.AsSpan(0, read));
+                EnsureWithinLimit(counter.TotalBytes, limit);
+                builder.Append(buffer, 0, read);
+            }
+            return builder.ToString();
         }
-
-        return builder.ToString();
+        finally
+        {
+            ArrayPool<char>.Shared.Return(buffer, clearArray: true);
+        }
     }
 
     private static void EnsureWithinLimit(long bytesRead, long limit)

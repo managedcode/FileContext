@@ -8,6 +8,7 @@ internal sealed class CsvRecordReader(TextReader reader, char delimiter, Cancell
 {
     private const char Quote = '"';
     private const int EndOfStream = -1;
+    private const int LineEndingBlockLength = 64;
     private readonly char[] _buffer = new char[4_096];
     private int _position;
     private int _length;
@@ -129,16 +130,21 @@ internal sealed class CsvRecordReader(TextReader reader, char delimiter, Cancell
 
     private void CountLineEndings(ReadOnlySpan<char> value)
     {
-        if (value.IsEmpty) { return; }
-
-        var firstEnding = value.IndexOfAny('\r', '\n');
-        if (firstEnding != 0) { _previousCarriageReturn = false; }
-        if (firstEnding < 0) { return; }
-
-        foreach (var character in value[firstEnding..])
+        while (!value.IsEmpty)
         {
-            if (character == '\r' || (character == '\n' && !_previousCarriageReturn)) { _line++; }
-            _previousCarriageReturn = character == '\r';
+            var ending = value.IndexOfAny('\r', '\n');
+            if (ending != 0) { _previousCarriageReturn = false; }
+            if (ending < 0) { return; }
+
+            value = value[ending..];
+            // Search past long text runs, then consume nearby line endings together.
+            var length = Math.Min(value.Length, LineEndingBlockLength);
+            foreach (var character in value[..length])
+            {
+                if (character == '\r' || (character == '\n' && !_previousCarriageReturn)) { _line++; }
+                _previousCarriageReturn = character == '\r';
+            }
+            value = value[length..];
         }
     }
 

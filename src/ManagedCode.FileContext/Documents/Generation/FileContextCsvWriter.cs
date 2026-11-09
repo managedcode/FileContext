@@ -46,20 +46,19 @@ internal static class FileContextCsvWriter
                 bytes += RowEnding.Length;
                 StorageFileCreator.EnsureWithinLimit(bytes, maximumBytes);
             }
-            var first = true;
-            foreach (var field in row)
+            var columnCount = row.Count;
+            for (var column = 0; column < columnCount; column++)
             {
                 token.ThrowIfCancellationRequested();
-                var value = field.AsSpan();
+                var value = row[column].AsSpan();
                 var quote = value.ContainsAny(quoteTriggers);
                 if (hasLimit)
                 {
-                    bytes += (long)Encoding.UTF8.GetByteCount(value) + (quote ? EscapedQuote.Length + (long)value.Count('"') : 0) + (first ? 0 : 1);
+                    bytes += (long)Encoding.UTF8.GetByteCount(value) + (quote ? EscapedQuote.Length + (long)value.Count('"') : 0) + (column == 0 ? 0 : 1);
                     StorageFileCreator.EnsureWithinLimit(bytes, maximumBytes);
                 }
-                if (!first) { writer.Write(delimiter); }
+                if (column > 0) { writer.Write(delimiter); }
                 WriteField(writer, value, quote);
-                first = false;
             }
             writer.Write(RowEnding);
         }

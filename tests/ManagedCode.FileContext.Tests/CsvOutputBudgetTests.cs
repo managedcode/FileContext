@@ -34,6 +34,47 @@ public sealed class CsvOutputBudgetTests
         created.Length.ShouldBe(options.MaximumGeneratedFileBytes);
     }
 
+    [Theory]
+    [InlineData(",")]
+    [InlineData("\t")]
+    public async Task Escaped_multiline_field_fits_exactly_and_one_byte_less_creates_no_file(string delimiter)
+    {
+        await using var storage = await TestStorageScope.CreateAsync();
+        var field = $"a{delimiter}b\r\n🧪\"";
+        var expected = $"\uFEFF\"a{delimiter}b\r\n🧪\"\"\"{delimiter}tail\r\n";
+        var options = new FileContextOptions { EnableWriteTools = true, MaximumGeneratedFileBytes = Encoding.UTF8.GetByteCount(expected) - 1 };
+        var store = new ManagedCodeStorageFileStore(storage.Storage, options);
+        var context = new FileContextService(store, options);
+        var document = new FileContextCsvDocument([[field, "tail"]], delimiter);
+
+        await Should.ThrowAsync<IOException>(() => context.Documents.CreateCsvAsync("small.csv", document));
+        (await context.ListFilesAsync()).ShouldBeEmpty();
+
+        options.MaximumGeneratedFileBytes++;
+        var created = await context.Documents.CreateCsvAsync("exact.csv", document);
+        await using var source = await store.OpenReadAsync(created.Path);
+        using var bytes = new MemoryStream();
+        await source.CopyToAsync(bytes);
+        bytes.ToArray().ShouldBe(Encoding.UTF8.GetBytes(expected));
+    }
+
+    [Fact]
+    public async Task Empty_csv_fits_at_exact_utf8_preamble_budget()
+    {
+        await using var storage = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { EnableWriteTools = true, MaximumGeneratedFileBytes = Encoding.UTF8.Preamble.Length };
+        var store = new ManagedCodeStorageFileStore(storage.Storage, options);
+        var context = new FileContextService(store, options);
+
+        var created = await context.Documents.CreateCsvAsync("empty.csv", new([]));
+
+        created.Length.ShouldBe(Encoding.UTF8.Preamble.Length);
+        await using var source = await store.OpenReadAsync(created.Path);
+        using var bytes = new MemoryStream();
+        await source.CopyToAsync(bytes);
+        bytes.ToArray().ShouldBe(Encoding.UTF8.GetPreamble());
+    }
+
     private sealed class OversizedRows : IReadOnlyList<IReadOnlyList<string?>>
     {
         public int Count => 2;

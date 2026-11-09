@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using DocumentFormat.OpenXml.Packaging;
 
@@ -26,9 +25,12 @@ public static class FileContextTableReader
             result = new(fileName, "xlsx", null, FileContextWorkbookTables.Read(workbook, headerRow, cancellationToken));
         }
         else { result = FileContextCsvTables.Read(source, fileName, headerRow, delimiter, cancellationToken); }
-        if (options.MaximumRangeReadBytes != long.MaxValue &&
-            JsonSerializer.SerializeToUtf8Bytes(result).LongLength > options.MaximumRangeReadBytes)
-        { throw new IOException("Table metadata exceeds the configured output read budget."); }
+        if (options.MaximumRangeReadBytes != long.MaxValue)
+        {
+            using var budget = new JsonByteBudgetStream(options.MaximumRangeReadBytes,
+                static () => new IOException("Table metadata exceeds the configured output read budget."), cancellationToken);
+            JsonSerializer.Serialize(budget, result);
+        }
         return result;
     }
 

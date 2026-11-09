@@ -101,7 +101,8 @@ internal static class FileContextReportRenderer
 
     private static void ValidateInputSize(FileContextReport report, int maximumInputBytes, CancellationToken token)
     {
-        using var counter = new ReportInputBudgetStream(maximumInputBytes, token);
+        using var counter = new JsonByteBudgetStream(maximumInputBytes,
+            () => new InvalidDataException($"Report input exceeds {maximumInputBytes} bytes."), token);
         try
         {
             JsonSerializer.Serialize(counter, report);

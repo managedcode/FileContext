@@ -76,6 +76,33 @@ public sealed class FileContextServiceTests
         result.Path.ShouldBe("sample.md");
     }
 
+    [Fact]
+    public async Task Markdown_graph_reflects_edits_and_deletes_between_operations()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { RootPrefix = "tenant" };
+        var store = new ManagedCodeStorageFileStore(scope.Storage, options);
+        var context = new FileContextService(store, options);
+        var unscoped = new ManagedCodeStorageFileStore(scope.Storage);
+        await unscoped.WriteAsync("tenant2/docs/foreign.md", "# Foreign title");
+        await store.WriteAsync("docs/edited.md", "# Original title");
+        await store.WriteAsync("docs/removed.md", "# Deleted title");
+
+        var before = await context.ExportMarkdownGraphAsync(MarkdownGraphFormat.Turtle, "docs");
+        before.DocumentCount.ShouldBe(2);
+        before.Content.ShouldContain("Original title");
+
+        await store.WriteAsync("docs/edited.md", "# Revised title");
+        (await store.DeleteAsync("docs/removed.md")).ShouldBeTrue();
+        var after = await context.ExportMarkdownGraphAsync(MarkdownGraphFormat.Turtle, "docs");
+
+        after.DocumentCount.ShouldBe(1);
+        after.Content.ShouldContain("Revised title");
+        after.Content.ShouldNotContain("Original title");
+        after.Content.ShouldNotContain("Deleted title");
+        after.Content.ShouldNotContain("Foreign title");
+    }
+
     [Theory]
     [InlineData(MarkdownGraphFormat.Mermaid, "graph LR")]
     [InlineData(MarkdownGraphFormat.Dot, "digraph")]

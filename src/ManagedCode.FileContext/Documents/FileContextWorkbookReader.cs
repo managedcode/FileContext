@@ -115,7 +115,7 @@ internal static class FileContextWorkbookReader
         return false;
     }
 
-    private static int ReadRowNumber(OpenXmlReader reader, int previous)
+    internal static int ReadRowNumber(OpenXmlReader reader, int previous)
     {
         var attributes = reader.Attributes;
         for (var index = 0; index < attributes.Count; index++)

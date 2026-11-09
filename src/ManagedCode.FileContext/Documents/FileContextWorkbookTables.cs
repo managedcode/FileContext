@@ -52,13 +52,23 @@ internal static class FileContextWorkbookTables
         using var reader = OpenXmlReader.Create(part);
         var headerCells = new Dictionary<int, string>();
         var rowNumber = 0;
-        while (reader.Read())
+        reader.Read();
+        while (!reader.EOF)
         {
             token.ThrowIfCancellationRequested();
-            if (reader.ElementType != typeof(Row) || !reader.IsStartElement) { continue; }
+            if (reader.ElementType != typeof(Row) || !reader.IsStartElement)
+            {
+                reader.Read();
+                continue;
+            }
+            rowNumber = FileContextWorkbookReader.ReadRowNumber(reader, rowNumber);
+            if (rowNumber < bounds.FirstRow || rowNumber > bounds.LastRow)
+            {
+                reader.Skip();
+                continue;
+            }
+
             var row = (Row)reader.LoadCurrentElement()!;
-            rowNumber = row.RowIndex is null ? rowNumber + 1 : checked((int)row.RowIndex.Value);
-            if (rowNumber < bounds.FirstRow || rowNumber > bounds.LastRow) { continue; }
             var captureHeader = accumulator.ShouldCaptureHeader(rowNumber);
             var hasData = false;
             var column = 0;
@@ -77,6 +87,7 @@ internal static class FileContextWorkbookTables
             }
             accumulator.Add(rowNumber, headerCells, lastColumn, hasData);
             headerCells.Clear();
+            reader.Read();
         }
         return accumulator.Result();
     }

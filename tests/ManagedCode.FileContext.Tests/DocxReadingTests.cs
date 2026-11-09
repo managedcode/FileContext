@@ -138,6 +138,42 @@ public sealed class DocxReadingTests
         await Should.ThrowAsync<System.Xml.XmlException>(() => context.Documents.ReadDocxTextAsync(PathInScope));
     }
 
+    [Fact]
+    public async Task Window_that_cannot_fit_the_next_emoji_resumes_without_losing_it()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { RootPrefix = "chat", MaximumDocxTextCharacters = 2 };
+        var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
+        await UploadAsync(scope, FileContextDocxTestFiles.WithParagraphs("A", "🧪B"));
+
+        var first = await context.Documents.ReadDocxTextAsync(PathInScope);
+        first.Paragraphs.ShouldHaveSingleItem().Text.ShouldBe("A");
+        (first.NextParagraph, first.NextCharacter).ShouldBe((2, 0));
+
+        var second = await context.Documents.ReadDocxTextAsync(PathInScope, 2);
+        second.Paragraphs.ShouldHaveSingleItem().Text.ShouldBe("🧪");
+        (second.NextParagraph, second.NextCharacter).ShouldBe((2, 2));
+
+        var third = await context.Documents.ReadDocxTextAsync(PathInScope, 2, 2);
+        third.Paragraphs.ShouldHaveSingleItem().Text.ShouldBe("B");
+        third.NextParagraph.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Exact_end_offset_preserves_empty_paragraph_and_rejects_offset_past_end()
+    {
+        await using var scope = await TestStorageScope.CreateAsync();
+        var options = new FileContextOptions { RootPrefix = "chat" };
+        var context = new FileContextService(new ManagedCodeStorageFileStore(scope.Storage, options), options);
+        await UploadAsync(scope, FileContextDocxTestFiles.WithParagraphs("аб", "next"));
+
+        var result = await context.Documents.ReadDocxTextAsync(PathInScope, startCharacter: 2);
+        result.Paragraphs.Select(p => p.Text).ShouldBe(["", "next"]);
+        var error = await Should.ThrowAsync<ArgumentOutOfRangeException>(() =>
+            context.Documents.ReadDocxTextAsync(PathInScope, startCharacter: 3));
+        error.ParamName.ShouldBe("startCharacter");
+    }
+
     private static async Task UploadAsync(TestStorageScope scope, byte[] content)
     {
         var result = await scope.Storage.UploadAsync(content,

@@ -1,7 +1,7 @@
 namespace ManagedCode.FileContext;
 
-/// <summary>Counts serialized report bytes without retaining them.</summary>
-internal sealed class ReportInputBudgetStream(int maximumBytes, CancellationToken token) : Stream
+/// <summary>Enforces a serialized JSON byte budget without retaining the payload.</summary>
+internal sealed class JsonByteBudgetStream(long maximumBytes, Func<Exception> limitExceeded, CancellationToken token) : Stream
 {
     private long _written;
 
@@ -22,7 +22,7 @@ internal sealed class ReportInputBudgetStream(int maximumBytes, CancellationToke
         token.ThrowIfCancellationRequested();
         if (buffer.Length > maximumBytes - _written)
         {
-            throw new InvalidDataException($"Report input exceeds {maximumBytes} bytes.");
+            throw limitExceeded();
         }
         _written += buffer.Length;
     }
