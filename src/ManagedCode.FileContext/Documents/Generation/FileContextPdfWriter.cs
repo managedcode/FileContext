@@ -14,9 +14,7 @@ internal static class FileContextPdfWriter
 
     private static readonly Lazy<byte[]> Font = new(() =>
     {
-        using var stream = typeof(FileContextPdfWriter).Assembly.GetManifestResourceStream(
-            "ManagedCode.FileContext.Documents.Assets.NotoSans-Regular.ttf")
-            ?? throw new InvalidOperationException("The bundled PDF font is missing.");
+        using var stream = BundledDocumentFont.Open();
         using var bytes = new MemoryStream();
         stream.CopyTo(bytes);
         return bytes.ToArray();

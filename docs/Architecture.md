@@ -84,6 +84,8 @@ source and retaining it through parsing/rendering when the host sets `MaximumCon
 `FileContextPdfRenderDocument` exposes page count and sequential page rendering from one parsed PDF;
 dispose it after the batch. The low-level synchronous image helpers remain caller-scheduled APIs.
 
+PDF rasterization ships the native HarfBuzz assets for Linux. If Skia cannot read its default system font, the page factory uses the bundled Noto Sans as its fallback and removes the temporary font file when the render document is disposed.
+
 PDF text, page rendering and embedded-image APIs accept bounded seekable streams. Storage-backed PDF tools retain seekable local `FileStream`/`MemoryStream` inputs but asynchronously stage other streams, including seekable cloud streams, to an automatically deleted temporary file. PdfPig's synchronous byte reads and seeks then remain local, without blocking on repeated network ranges. `PdfSourceStagingMode.TemporaryFile` also stages local inputs. `PdfSourceBufferBytes` bounds every copy read and `PdfTemporaryDirectory` optionally selects an existing host directory. No whole-document managed array is created. Native raster decoding has a separate per-page source-image pixel budget; lowering output scale does not reduce source bitmap allocation.
 
 Hosts can configure bounds for large operations through `IOptions<FileContextOptions>`: PDF source/page/image budgets, full-read bytes, range bytes, files scanned, bytes per searched file, matches per file, total search results, graph documents, graph source bytes, and exported graph characters. Non-seekable cloud streams are supported by sequential streaming.

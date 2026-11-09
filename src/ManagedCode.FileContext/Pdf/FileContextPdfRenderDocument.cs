@@ -25,7 +25,7 @@ public sealed class FileContextPdfRenderDocument : IDisposable
         FileContextPdfSource.Validate(pdf, _options);
         _source = pdf;
         _document = PdfDocument.Open(pdf, SkiaRenderingParsingOptions.Instance);
-        _document.AddSkiaPageFactory();
+        FileContextPdfPageFactory.Register(_document);
     }
 
     public int PageCount => _document.NumberOfPages;

@@ -12,9 +12,7 @@ internal static class ReportCanvas
     private const int SingleMeasurementLength = 256;
     private static readonly Lazy<SKTypeface> Typeface = new(() =>
     {
-        using var stream = typeof(ReportCanvas).Assembly.GetManifestResourceStream(
-            "ManagedCode.FileContext.Documents.Assets.NotoSans-Regular.ttf")
-            ?? throw new InvalidOperationException("The bundled report font is missing.");
+        using var stream = BundledDocumentFont.Open();
         return SKTypeface.FromStream(stream) ?? throw new InvalidOperationException("The bundled report font cannot be loaded.");
     });
 
